@@ -1,11 +1,13 @@
-# Mantém o Supabase (plano gratuito) sempre ativo: a cada 2 dias grava um sinal de
-# atividade no banco. Assim o projeto nunca chega aos 7 dias sem uso que causam a pausa.
+# Mantém o Supabase (plano gratuito) sempre ativo: TODO DIA grava um sinal de atividade
+# no banco, nos servidores do GitHub (não depende de nenhum computador ligado).
+# Assim o projeto nunca chega aos 7 dias sem uso que causam a pausa.
 # Se o sinal falhar, o GitHub envia e-mail de falha para a dona do repositório.
 name: Manter Supabase ativo
 
 on:
   schedule:
-    - cron: '17 11 */2 * *'   # a cada 2 dias, por volta das 08h17 (Brasília)
+    - cron: '17 11 * * *'     # todo dia, por volta das 08h17 (Brasília)
+    - cron: '47 23 * * *'     # e de novo às 20h47, caso o GitHub atrase ou pule a execução da manhã
   workflow_dispatch:           # permite rodar manualmente pela aba Actions
 
 permissions:
@@ -34,6 +36,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Registrar data do último sinal
         run: |
+          # basta 1 registro por semana (o limite do GitHub é 60 dias)
+          if [ -f ultimo-sinal-supabase.txt ] && [ $(( $(date +%s) - $(date -d "$(cat ultimo-sinal-supabase.txt)" +%s) )) -lt 604800 ]; then
+            echo "Registro semanal já feito em $(cat ultimo-sinal-supabase.txt)"; exit 0
+          fi
           date -u +"%Y-%m-%dT%H:%M:%SZ" > ultimo-sinal-supabase.txt
           git config user.name "manter-ativo"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
