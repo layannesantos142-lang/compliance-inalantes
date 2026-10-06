@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Compliance — Inalantes e Produtos Perigosos</title>
-<link rel="stylesheet" href="css/estilo.css?v=2026100603">
+<link rel="stylesheet" href="css/estilo.css?v=2026100604">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js?v=2026100601"></script>
@@ -77,6 +77,9 @@
       <button class="sb-steprow" style="--c:#525252" onclick="abrirAdmin(this)">
         <span class="sb-chip">⚙</span><span class="sb-steptxt">Usuários e acessos</span>
       </button>
+      <button class="sb-steprow" style="--c:#525252" onclick="abrirAuditoria(this)">
+        <span class="sb-chip">🛡</span><span class="sb-steptxt">Registro de acessos</span>
+      </button>
     </div>
   </div>
   <div class="sb-foot">
@@ -109,6 +112,7 @@
         <button class="rbh-pdf" onclick="baixarDocumento('plano_5w2h_xlsx')" style="background:#1D6F42">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15V3"/><path d="M7 10l5 5 5-5"/><path d="M3 20h18"/></svg> BAIXAR EXCEL
         </button>
+        <button class="rbh-pdf" id="pa-btn-nova" onclick="abrirNovaAcao()" style="background:#BD2335" title="Incluir uma nova ação no plano (passa pela aprovação da administradora)">+ NOVA AÇÃO</button>
         <input type="file" id="pa-xlsx-input" accept=".xlsx,.xls" hidden>
         <button class="rbh-pdf" id="pa-btn-importar" onclick="document.getElementById('pa-xlsx-input').click()" style="background:#0D47A1" title="Somente administradores: substitui o plano pelas ações da planilha e atualiza o arquivo de download" hidden>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M3 20h18"/></svg> ATUALIZAR PELO EXCEL
@@ -185,7 +189,30 @@
     <div class="pa-modal-eyebrow" id="pa-modal-eyebrow">Solicitar atualização</div>
     <h3 id="pa-modal-titulo"></h3>
     <p class="pa-modal-sub" id="pa-modal-sub"></p>
-    <div class="pa-modal-grid">
+    <div id="pa-f-novos" hidden>
+      <div class="pa-modal-grid">
+        <div><label class="adm-lb">Fase / Área *</label><select class="adm-in" id="pa-f-fase"></select></div>
+        <div><label class="adm-lb">Prioridade *</label>
+          <select class="adm-in" id="pa-f-prio"><option>Alta</option><option selected>Média</option><option>Baixa</option></select></div>
+        <div><label class="adm-lb">Custo (Quanto?)</label><input class="adm-in" id="pa-f-quanto" placeholder="Ex.: Sem custo"></div>
+      </div>
+      <label class="adm-lb">O quê? (What) *</label>
+      <textarea class="adm-in" id="pa-f-oque" rows="2" placeholder="Ação a ser realizada"></textarea>
+      <label class="adm-lb">Por quê? (Why)</label>
+      <textarea class="adm-in" id="pa-f-porque" rows="2"></textarea>
+      <div class="pa-modal-grid">
+        <div><label class="adm-lb">Onde? (Where)</label><input class="adm-in" id="pa-f-onde"></div>
+        <div><label class="adm-lb">Quem? — Área</label><input class="adm-in" id="pa-f-quemarea" placeholder="Ex.: Cadastros"></div>
+        <div><label class="adm-lb">Quem? — Colaborador</label><input class="adm-in" id="pa-f-quem"></div>
+      </div>
+      <div class="pa-modal-grid">
+        <div style="grid-column:span 2"><label class="adm-lb">Como? (How)</label><input class="adm-in" id="pa-f-como"></div>
+        <div><label class="adm-lb">Gestor</label><input class="adm-in" id="pa-f-gestor"></div>
+      </div>
+    </div>
+    <div class="pa-modal-grid pa-modal-grid4">
+      <div><label class="adm-lb">Início</label>
+        <input class="adm-in" id="pa-f-inicio" type="date"></div>
       <div><label class="adm-lb">Status</label>
         <select class="adm-in" id="pa-f-status">
           <option>Não iniciado</option><option>Em andamento</option><option>Concluído</option><option>Atrasado</option><option>Cancelado</option>
@@ -360,6 +387,45 @@
     <div class="card" style="margin-top:20px">
       <h3>🔐 Perfis de acesso</h3>
       <div id="adm-perfis" class="adm-perfis"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ VISTA: REGISTRO DE ACESSOS (AUDITORIA) ============ -->
+<div id="view-auditoria" class="fluxo-view">
+  <div class="rbh">
+    <div class="rbh-topo"><span data-param="doc_confidencialidade"></span></div>
+    <div class="rbh-corpo">
+      <div class="rbh-eyebrow">Administração</div>
+      <div class="rbh-title">Registro de acessos</div>
+      <div class="rbh-sub">Quem entrou, quando, o que consultou, baixou ou alterou. O registro é gravado pelo banco e não pode ser editado nem apagado pelos usuários.</div>
+    </div>
+  </div>
+  <div class="adm-wrap">
+    <div class="card au-filtros">
+      <div><label class="adm-lb">Usuário</label><select class="adm-in" id="au-usuario"><option value="">Todos</option></select></div>
+      <div><label class="adm-lb">Evento</label>
+        <select class="adm-in" id="au-evento">
+          <option value="">Todos</option><option value="login">Entrada no sistema</option><option value="logout">Saída</option>
+          <option value="consulta">Consulta</option><option value="download">Download</option><option value="alteracao">Alteração</option>
+          <option value="importacao">Importação do Excel</option><option value="senha">Troca de senha</option>
+        </select></div>
+      <div><label class="adm-lb">De</label><input class="adm-in" id="au-de" type="date"></div>
+      <div><label class="adm-lb">Até</label><input class="adm-in" id="au-ate" type="date"></div>
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <button class="btn-pdf" type="button" onclick="carregarAuditoria()">Filtrar</button>
+        <button class="btn-limpar" type="button" onclick="exportarAuditoria()">Exportar CSV</button>
+      </div>
+    </div>
+    <div class="au-kpis" id="au-kpis"></div>
+    <div class="card" style="margin-top:16px">
+      <div class="tabela-wrapper">
+        <table>
+          <thead><tr><th>Data / hora</th><th>Usuário</th><th>Evento</th><th>Detalhe</th></tr></thead>
+          <tbody id="au-linhas"></tbody>
+        </table>
+      </div>
+      <div id="au-rodape" class="contagem" style="margin-top:8px"></div>
     </div>
   </div>
 </div>
@@ -829,6 +895,6 @@
   </div>
 </div>
 
-<script src="js/app.js?v=2026100603"></script>
+<script src="js/app.js?v=2026100604"></script>
 </body>
 </html>
