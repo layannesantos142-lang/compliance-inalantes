@@ -1226,9 +1226,16 @@
     await recarregarPlano();
   });
 
+  // "Data / Versão" do plano é atualizada pelo banco a cada alteração
+  async function atualizarVersaoPlano() {
+    const { data } = await sb.from('parametros').select('chave,valor').eq('chave', 'plano_data_versao');
+    (data || []).forEach(p => { S.param[p.chave] = p.valor; });
+    aplicarParametros();
+  }
   async function recarregarPlano() {
     const novas = await buscar('plano_acao', 'numero');
     renderPlano5w2h(S.fases, novas);
+    atualizarVersaoPlano();
     await carregarAprovacoes();
   }
 
@@ -1341,6 +1348,7 @@
       S.documentos.plano_5w2h_xlsx = doc;
       const novas = await buscar('plano_acao', 'numero');
       renderPlano5w2h(S.fases, novas);
+      atualizarVersaoPlano();
       registrar('importacao', `Plano de ação substituído pela planilha "${arquivo.name}" (${novas.length} ações)`);
       msg(`Plano atualizado: ${novas.length} ações importadas e planilha "${arquivo.name}" disponível em BAIXAR EXCEL.`);
     } catch (e) {
