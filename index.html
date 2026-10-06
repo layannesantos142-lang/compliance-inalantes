@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Compliance — Inalantes e Produtos Perigosos</title>
-<link rel="stylesheet" href="css/estilo.css?v=2026100604">
+<link rel="stylesheet" href="css/estilo.css?v=2026100606">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js?v=2026100601"></script>
@@ -402,6 +402,16 @@
     </div>
   </div>
   <div class="adm-wrap">
+    <div class="card au-backup">
+      <div>
+        <h3>🛟 Backups e proteção dos dados</h3>
+        <div id="bk-status" style="font-size:13px;line-height:1.6;color:var(--cinza-escuro)">Carregando…</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:stretch">
+        <button class="btn-pdf" type="button" id="bk-baixar" onclick="baixarBackup()">⬇ Baixar backup completo (Excel)</button>
+        <span style="font-size:11px;color:var(--cinza-medio);max-width:260px">Guarde a cópia na pasta do projeto ou no OneDrive da empresa, de preferência uma vez por mês.</span>
+      </div>
+    </div>
     <div class="card au-filtros">
       <div><label class="adm-lb">Usuário</label><select class="adm-in" id="au-usuario"><option value="">Todos</option></select></div>
       <div><label class="adm-lb">Evento</label>
@@ -895,6 +905,6 @@
   </div>
 </div>
 
-<script src="js/app.js?v=2026100605"></script>
+<script src="js/app.js?v=2026100606"></script>
 </body>
 </html>
