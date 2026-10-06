@@ -244,6 +244,7 @@
       S.fases = fases;
       renderPlano5w2h(fases, acoes);
       aplicarAcesso();
+      carregarAprovacoes();
     } catch (e) {
       console.error(e);
       $('carregando-msg').innerHTML = '<strong style="color:#BD2335">Erro ao carregar dados:</strong><br>' + esc(e.message) +
@@ -869,6 +870,7 @@
         dias = '<div style="font-size:10px;color:#aaa;font-style:italic">sem prazo definido</div>';
       }
       return `<tr><td style="text-align:center;font-weight:700;color:#aaa">${a.numero}</td>
+        <td class="pa-upd" data-num="${a.numero}"></td>
         <td><span class="pb ${prio[a.prioridade] || 'pb-ni'}">${esc(a.prioridade)}</span></td>
         <td style="font-weight:600">${esc(a.o_que)}${a.observacoes ? `<div style="font-weight:400;font-size:11px;color:#888;margin-top:4px">Obs.: ${esc(a.observacoes)}</div>` : ''}</td>
         <td>${esc(a.por_que)}</td><td>${esc(a.onde)}</td>
@@ -879,6 +881,218 @@
         <td><span class="pb ${cls}">${esc(st)}</span></td>
         <td style="text-align:center;font-weight:700;color:#aaa">${a.percentual}%</td></tr>`;
     }).join('');
+    S.acoes = acoes;
+    marcarLinhasPlano();
+  }
+
+  // ---------------------------------------------------------------- plano: solicitações com aprovação da administradora
+  const AP = { sol: [], hist: [], uid: null };
+  const ROT = { status: 'Status', percentual: '% concluído', prazo: 'Prazo', observacoes: 'Observação' };
+  const fmtVal = (k, v) => v == null || v === '' ? '—'
+    : k === 'percentual' ? v + '%'
+    : k === 'prazo' ? new Date(String(v).slice(0, 10) + 'T00:00').toLocaleDateString('pt-BR')
+    : String(v);
+  const fmtDataHora = d => new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const snapshotAcao = a => a ? { status: a.status, percentual: a.percentual, prazo: a.prazo, observacoes: a.observacoes } : null;
+  function diffHtml(antes, depois, so) {
+    const chaves = so || Object.keys(ROT).filter(k => String((antes || {})[k] ?? '') !== String((depois || {})[k] ?? ''));
+    return chaves.map(k => `<div><b>${ROT[k]}:</b> <span class="de">${esc(fmtVal(k, (antes || {})[k]))}</span> → <span class="para">${esc(fmtVal(k, (depois || {})[k]))}</span></div>`).join('')
+      || '<div style="color:#888">Sem diferença</div>';
+  }
+  function avisoPlano(texto, erro) {
+    const el = $('pa-aprov-msg');
+    el.hidden = !texto; el.textContent = texto || '';
+    el.style.background = erro ? 'var(--vermelho-claro)' : 'var(--verde-claro)';
+    el.style.color = erro ? 'var(--vermelho-texto)' : 'var(--verde-texto)';
+    if (texto && !erro) setTimeout(() => { if (el.textContent === texto) el.hidden = true; }, 6000);
+  }
+  const msgErro = e => String((e && e.message) || e).replace(/^.*?ERROR:\s*/i, '');
+
+  async function carregarAprovacoes() {
+    if (!pode('plano5w2h')) return;
+    const { data: ss } = await sb.auth.getSession();
+    AP.uid = ss && ss.session ? ss.session.user.id : null;
+    const [s, h] = await Promise.all([
+      sb.from('plano_solicitacoes').select('*').order('criado_em', { ascending: false }).limit(60),
+      sb.from('plano_historico').select('*').order('alterado_em', { ascending: false }).limit(40)
+    ]);
+    AP.sol = s.data || [];
+    AP.hist = h.data || [];
+    renderAprovacoes();
+    marcarLinhasPlano();
+    atualizarBadgePlano();
+  }
+
+  function atualizarBadgePlano() {
+    const n = S.acesso && S.acesso.admin ? AP.sol.filter(x => x.situacao === 'pendente').length : 0;
+    document.querySelectorAll('[onclick*="abrirPlanoAcao"]').forEach(b => {
+      b.querySelectorAll('.pa-badge').forEach(x => x.remove());
+      if (n) b.insertAdjacentHTML('beforeend', `<span class="pa-badge" title="Solicitações aguardando sua aprovação">${n}</span>`);
+    });
+  }
+
+  function marcarLinhasPlano() {
+    const admin = S.acesso && S.acesso.admin;
+    document.querySelectorAll('#pa-acoes .pa-upd').forEach(td => {
+      const num = +td.dataset.num;
+      const pend = AP.sol.filter(x => x.situacao === 'pendente' && x.acao_numero === num);
+      if (!pode('plano5w2h')) { td.innerHTML = ''; return; }
+      if (admin) {
+        td.innerHTML = `<button class="pa-upd-btn" data-editar="${num}">✎ Editar</button>` +
+          (pend.length ? `<div class="pa-pend-tag">⏳ ${pend.length} para aprovar</div>` : '');
+      } else {
+        const minha = pend.find(x => x.solicitante === AP.uid);
+        td.innerHTML = minha ? '<span class="pa-pend-tag">⏳ Aguardando aprovação</span>'
+          : `<button class="pa-upd-btn" data-solicitar="${num}">Solicitar atualização</button>`;
+      }
+    });
+    document.querySelectorAll('#pa-acoes [data-editar]').forEach(b => b.onclick = () => abrirFormPlano(+b.dataset.editar, true));
+    document.querySelectorAll('#pa-acoes [data-solicitar]').forEach(b => b.onclick = () => abrirFormPlano(+b.dataset.solicitar, false));
+  }
+
+  function renderAprovacoes() {
+    const box = $('pa-aprov-box');
+    const admin = S.acesso && S.acesso.admin;
+    if (admin) {
+      const pend = AP.sol.filter(x => x.situacao === 'pendente');
+      const cards = pend.map(s => {
+        const atual = snapshotAcao((S.acoes || []).find(a => a.numero === s.acao_numero));
+        const mudou = atual && Object.keys(s.valores_anteriores || {}).some(k => String(atual[k] ?? '') !== String(s.valores_anteriores[k] ?? ''));
+        return `<div class="pa-sol" data-sol="${s.id}">
+          <div class="pa-sol-top"><strong>Ação ${s.acao_numero} · ${esc(s.acao_titulo || '')}</strong>
+            <span>Solicitado por <b>${esc(s.solicitante_nome)}</b> em ${fmtDataHora(s.criado_em)}</span></div>
+          <div class="pa-diff">${diffHtml(s.valores_anteriores, Object.assign({}, s.valores_anteriores, s.campos), Object.keys(s.campos))}</div>
+          ${s.comentario ? `<div class="pa-sol-coment">💬 ${esc(s.comentario)}</div>` : ''}
+          ${mudou ? '<div class="pa-sol-aviso">⚠ A ação foi alterada depois desta solicitação — confira antes de aprovar.</div>' : ''}
+          <div class="pa-sol-acoes">
+            <input type="text" placeholder="Motivo / observação da decisão (opcional)" data-motivo>
+            <button class="pa-btn-ok" data-aprovar>✓ Aprovar</button>
+            <button class="pa-btn-no" data-recusar>✕ Recusar</button>
+          </div></div>`;
+      }).join('') || '<div class="pa-aprov-vazio">Nenhuma solicitação aguardando aprovação.</div>';
+
+      const origem = h => h.origem === 'aprovacao' ? `Aprovado · solicitado por ${esc(h.solicitante_nome || '—')}`
+        : h.origem === 'edicao_admin' ? 'Edição direta' : '↩ Desfazer';
+      const linhas = AP.hist.map(h => `<tr class="${h.desfeito_em ? 'desfeito' : ''}">
+          <td style="white-space:nowrap">${fmtDataHora(h.alterado_em)}</td>
+          <td><b>${h.acao_numero}</b> · ${esc((h.acao_titulo || '').slice(0, 60))}</td>
+          <td>${origem(h)}<div style="color:#999;font-size:11px">por ${esc(h.alterado_por_nome || '—')}</div></td>
+          <td><div class="pa-diff" style="margin:0">${diffHtml(h.antes, h.depois)}</div></td>
+          <td style="white-space:nowrap">${h.desfeito_em ? `<span class="pa-sit cancelada">Desfeito ${fmtDataHora(h.desfeito_em)}</span>`
+            : h.origem === 'desfazer' ? '' : `<button class="pa-btn-no" data-desfazer="${h.id}">↩ Desfazer</button>`}</td></tr>`).join('');
+
+      box.innerHTML = `
+        <div class="pa-aprov">
+          <div class="pa-aprov-head"><h3>🔔 Solicitações aguardando sua aprovação (${pend.length})</h3>
+            <span style="font-size:11px;color:#888">O plano só muda depois que você aprova</span></div>
+          <div class="pa-aprov-cont">${cards}</div>
+        </div>
+        <details class="pa-aprov" ${AP.hist.length ? '' : 'hidden'}>
+          <summary class="pa-aprov-head" style="cursor:pointer;list-style:none"><h3>🕘 Histórico de alterações (${AP.hist.length})</h3>
+            <span style="font-size:11px;color:#888">Clique para abrir · use ↩ Desfazer para voltar uma alteração</span></summary>
+          <div style="overflow-x:auto"><table class="pa-hist">
+            <thead><tr><th>Quando</th><th>Ação</th><th>Origem</th><th>O que mudou (antes → depois)</th><th></th></tr></thead>
+            <tbody>${linhas}</tbody></table></div>
+        </details>`;
+
+      box.querySelectorAll('.pa-sol').forEach(card => {
+        const id = +card.dataset.sol;
+        const motivo = () => card.querySelector('[data-motivo]').value;
+        card.querySelector('[data-aprovar]').onclick = () => decidirSolicitacao(id, true, motivo(), card);
+        card.querySelector('[data-recusar]').onclick = () => decidirSolicitacao(id, false, motivo(), card);
+      });
+      box.querySelectorAll('[data-desfazer]').forEach(b => b.onclick = () => desfazerAlteracao(+b.dataset.desfazer, b));
+    } else {
+      const minhas = AP.sol.slice(0, 10);
+      const nomeSit = { pendente: 'Aguardando aprovação', aprovada: 'Aprovada', recusada: 'Recusada', cancelada: 'Cancelada' };
+      box.innerHTML = `<div class="pa-aprov">
+        <div class="pa-aprov-head"><h3>📨 Minhas solicitações de atualização</h3>
+          <span style="font-size:11px;color:#888">As alterações entram no plano após aprovação da administradora</span></div>
+        <div class="pa-aprov-cont">${minhas.map(s => `<div class="pa-sol" style="border-left-color:${s.situacao === 'aprovada' ? '#2E7D32' : s.situacao === 'recusada' ? '#B71C1C' : '#C9A839'}">
+            <div class="pa-sol-top"><strong>Ação ${s.acao_numero} · ${esc(s.acao_titulo || '')}</strong>
+              <span class="pa-sit ${s.situacao}">${nomeSit[s.situacao]}</span></div>
+            <div class="pa-diff">${diffHtml(s.valores_anteriores, Object.assign({}, s.valores_anteriores, s.campos), Object.keys(s.campos))}</div>
+            <div style="font-size:11px;color:#888">Enviada em ${fmtDataHora(s.criado_em)}${s.decidido_em && s.situacao !== 'cancelada' ? ` · decidida por ${esc(s.decidido_por_nome || '')} em ${fmtDataHora(s.decidido_em)}` : ''}</div>
+            ${s.motivo_decisao ? `<div class="pa-sol-coment">Retorno: ${esc(s.motivo_decisao)}</div>` : ''}
+            ${s.situacao === 'pendente' ? `<div class="pa-sol-acoes"><button class="pa-btn-no" data-cancelar="${s.id}">Cancelar solicitação</button></div>` : ''}
+          </div>`).join('') || '<div class="pa-aprov-vazio">Você ainda não enviou solicitações. Use “Solicitar atualização” na ação desejada.</div>'}</div></div>`;
+      box.querySelectorAll('[data-cancelar]').forEach(b => b.onclick = async () => {
+        const { error } = await sb.rpc('cancelar_solicitacao_plano', { p_id: +b.dataset.cancelar });
+        if (error) return avisoPlano('Erro: ' + msgErro(error), true);
+        avisoPlano('Solicitação cancelada.');
+        carregarAprovacoes();
+      });
+    }
+  }
+
+  let formPlano = { num: null, admin: false };
+  function abrirFormPlano(num, comoAdmin) {
+    const a = (S.acoes || []).find(x => x.numero === num);
+    if (!a) return;
+    formPlano = { num, admin: comoAdmin };
+    $('pa-modal-eyebrow').textContent = comoAdmin ? 'Editar ação (aplica imediatamente)' : 'Solicitar atualização';
+    $('pa-modal-titulo').textContent = `Ação ${a.numero} · ${a.o_que}`;
+    $('pa-modal-sub').textContent = comoAdmin
+      ? 'Como administradora, a alteração é aplicada na hora e fica registrada no histórico, com opção de desfazer.'
+      : 'A alteração só entra no plano depois de aprovada pela administradora (Layanne Santos · Compliance).';
+    $('pa-f-status').value = a.status;
+    $('pa-f-pct').value = a.percentual;
+    $('pa-f-prazo').value = a.prazo || '';
+    $('pa-f-obs').value = a.observacoes || '';
+    $('pa-f-coment').value = '';
+    $('pa-f-coment-box').hidden = comoAdmin;
+    $('pa-f-enviar').textContent = comoAdmin ? 'Salvar alteração' : 'Enviar para aprovação';
+    $('pa-f-erro').textContent = '';
+    $('pa-modal').hidden = false;
+  }
+
+  $('pa-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const campos = {
+      status: $('pa-f-status').value,
+      percentual: Math.max(0, Math.min(100, parseInt($('pa-f-pct').value || '0', 10))),
+      prazo: $('pa-f-prazo').value || null,
+      observacoes: $('pa-f-obs').value.trim() || null
+    };
+    if (campos.status === 'Concluído' && campos.percentual < 100) campos.percentual = 100;
+    $('pa-f-enviar').disabled = true;
+    const { error } = formPlano.admin
+      ? await sb.rpc('editar_acao_plano', { p_numero: formPlano.num, p_campos: campos })
+      : await sb.rpc('solicitar_alteracao_plano', { p_numero: formPlano.num, p_campos: campos, p_comentario: $('pa-f-coment').value });
+    $('pa-f-enviar').disabled = false;
+    if (error) { $('pa-f-erro').textContent = msgErro(error); return; }
+    $('pa-modal').hidden = true;
+    avisoPlano(formPlano.admin ? 'Ação atualizada. A alteração está no histórico, com opção de desfazer.'
+      : 'Solicitação enviada. O plano será atualizado assim que a administradora aprovar.');
+    await recarregarPlano();
+  });
+
+  async function recarregarPlano() {
+    const novas = await buscar('plano_acao', 'numero');
+    renderPlano5w2h(S.fases, novas);
+    await carregarAprovacoes();
+  }
+
+  async function decidirSolicitacao(id, aprovar, motivo, card) {
+    card.querySelectorAll('button').forEach(b => { b.disabled = true; });
+    const { error } = await sb.rpc('decidir_solicitacao_plano', { p_id: id, p_aprovar: aprovar, p_motivo: motivo || null });
+    if (error) { card.querySelectorAll('button').forEach(b => { b.disabled = false; }); return avisoPlano('Erro: ' + msgErro(error), true); }
+    avisoPlano(aprovar ? 'Alteração aprovada e aplicada ao plano.' : 'Solicitação recusada. O plano não foi alterado.');
+    await recarregarPlano();
+  }
+
+  async function desfazerAlteracao(id, botao) {
+    if (botao.dataset.confirmar !== '1') {
+      botao.dataset.confirmar = '1';
+      botao.textContent = 'Confirmar desfazer?';
+      setTimeout(() => { if (botao.isConnected) { botao.dataset.confirmar = ''; botao.textContent = '↩ Desfazer'; } }, 4000);
+      return;
+    }
+    botao.disabled = true;
+    const { error } = await sb.rpc('desfazer_alteracao_plano', { p_hist: id });
+    if (error) { botao.disabled = false; return avisoPlano('Erro: ' + msgErro(error), true); }
+    avisoPlano('Alteração desfeita: a ação voltou ao estado anterior.');
+    await recarregarPlano();
   }
 
   // ---------------------------------------------------------------- atualizar plano a partir do Excel (administradores)
