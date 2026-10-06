@@ -1468,7 +1468,47 @@
     sel.innerHTML = '<option value="">Todos</option>' + usuarios.map(u => `<option value="${u.user_id}">${esc(u.nome || u.email)}</option>`).join('');
     sel.value = atual;
     if (!$('au-de').value) $('au-de').value = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+    carregarBackups();
     carregarAuditoria();
+  };
+
+  // ---------------------------------------------------------------- backups (cópia automática diária no Supabase + download em Excel)
+  async function carregarBackups() {
+    const [b, s] = await Promise.all([
+      sb.rpc('listar_backups'),
+      sb.from('sistema_atividade').select('criado_em,origem').order('criado_em', { ascending: false }).limit(1)
+    ]);
+    const lista = b.data || [];
+    const ultimo = lista[0];
+    const sinal = (s.data || [])[0];
+    const horas = ultimo ? (Date.now() - new Date(ultimo.lote)) / 36e5 : Infinity;
+    const ok = (bom, txt) => `<div>${bom ? '✅' : '⚠️'} ${txt}</div>`;
+    $('bk-status').innerHTML =
+      ok(horas < 30, ultimo ? `Último backup automático: <b>${fmtDataHora(ultimo.lote)}</b> (${ultimo.tabelas} tabelas, ${fmtN(ultimo.linhas)} linhas)` : 'Nenhum backup automático encontrado')
+      + ok(lista.length > 0, `${lista.length} cópia(s) guardada(s) no banco: últimos 30 dias + 1 por mês durante 12 meses. Cópia nova todo dia às 03h.`)
+      + ok(sinal && (Date.now() - new Date(sinal.criado_em)) / 864e5 < 3, sinal ? `Último sinal de atividade: <b>${fmtDataHora(sinal.criado_em)}</b> — o sistema não será pausado por falta de uso.` : 'Nenhum sinal de atividade registrado')
+      + (b.error ? `<div style="color:#B71C1C">Erro: ${esc(b.error.message)}</div>` : '');
+  }
+  window.baixarBackup = async function () {
+    const btn = $('bk-baixar'), rot = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Gerando backup…';
+    try {
+      const [{ data, error }] = await Promise.all([sb.rpc('exportar_backup'), carregarSheetJS()]);
+      if (error) throw error;
+      const wb = XLSX.utils.book_new();
+      const cel = v => v != null && typeof v === 'object' ? JSON.stringify(v) : v;
+      Object.keys(data).sort().forEach(t => {
+        const linhas = (data[t] || []).map(r => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, cel(v)])));
+        const ws = linhas.length ? XLSX.utils.json_to_sheet(linhas) : XLSX.utils.aoa_to_sheet([['(sem registros)']]);
+        XLSX.utils.book_append_sheet(wb, ws, t.slice(0, 31));
+      });
+      const nome = 'Backup_Compliance_Inalantes_' + new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '') + '.xlsx';
+      XLSX.writeFile(wb, nome);
+      registrar('download', `Baixou o backup completo (${Object.keys(data).length} tabelas)`);
+    } catch (e) {
+      alert('Não foi possível gerar o backup: ' + ((e && e.message) || e));
+    }
+    btn.disabled = false; btn.textContent = rot;
   };
   window.carregarAuditoria = async function () {
     $('au-rodape').textContent = 'Carregando…';
