@@ -123,6 +123,22 @@
     valores.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; s.appendChild(o); });
   }
 
+  // ---------------------------------------------------------------- auditoria (registro de acessos)
+  // Grava no banco quem entrou, o que consultou e o que baixou; alterações são registradas pelo próprio banco.
+  let ultimoRegistro = '';
+  function registrar(evento, detalhe, dados) {
+    const chave = evento + '|' + detalhe;
+    if (evento === 'consulta' && chave === ultimoRegistro) return Promise.resolve();
+    ultimoRegistro = chave;
+    return sb.rpc('registrar_evento', { p_evento: evento, p_detalhe: detalhe || null, p_dados: dados || null, p_navegador: navigator.userAgent })
+      .then(r => { if (r.error) console.warn('auditoria:', r.error.message); }, () => {});
+  }
+  let loginNovo = false;
+  window.addEventListener('beforeprint', () => {
+    const vista = document.querySelector('.fluxo-view.ativa .rbh-title');
+    registrar('download', 'Exportou / imprimiu PDF — ' + (vista ? vista.textContent.trim() : 'Relatório de Compliance'));
+  });
+
   // ---------------------------------------------------------------- autenticação
   async function iniciar() {
     const { data } = await sb.auth.getSession();
@@ -144,6 +160,7 @@
       return;
     }
     $('tela-login').hidden = true;
+    loginNovo = true;
     posLogin(data.user);
   });
 
@@ -177,12 +194,13 @@
     }
     $('senha-erro').style.color = 'var(--verde-texto)';
     $('senha-erro').textContent = 'Senha alterada com sucesso.';
+    registrar('senha', trocaObrigatoria ? 'Criou a senha pessoal no primeiro acesso' : 'Alterou a própria senha');
     setTimeout(() => {
       $('tela-senha').hidden = true;
       if (trocaObrigatoria) { trocaObrigatoria = false; carregar(); }
     }, 900);
   });
-  window.sair = async () => { await sb.auth.signOut(); location.reload(); };
+  window.sair = async () => { await registrar('logout', 'Saiu do sistema'); await sb.auth.signOut(); location.reload(); };
 
   // ---------------------------------------------------------------- carga inicial
   async function carregar() {
@@ -198,6 +216,8 @@
         document.querySelector('#tela-carregando .spinner').hidden = true;
         return;
       }
+      registrar('login', loginNovo ? 'Entrou com e-mail e senha' : 'Retomou a sessão salva no navegador',
+        { perfil: S.acesso.admin ? 'Administradora' : S.acesso.perfil || null });
       const [param, filiais, familias, classes, produtos, normas, comparativos, blocos, requisitos, incompat,
         criterios, exposicao, vistoria, ncs, ccProd, ccCrit, etapas, passos, prazos, fases, acoes, roteiro, docs, evid] =
         await Promise.all([
@@ -288,6 +308,7 @@
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('ativo'));
     $(id).classList.add('ativa');
     el.classList.add('ativo');
+    registrar('consulta', 'Relatório · aba ' + el.textContent.replace(/\s+/g, ' ').trim());
     if (id === 'estoque') abrirEstoque();
     if (id === 'nao-inalantes') abrirRevisao();
     if (id === 'evidencias') abrirEvidenciasFiliais();
@@ -299,6 +320,8 @@
     $(id).classList.add('ativa');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     document.body.classList.remove('sb-aberta');
+    const titulo = $(id).querySelector('.rbh-title, h1');
+    if (id !== 'view-sem-abas') registrar('consulta', titulo && titulo.textContent.trim() ? titulo.textContent.replace(/\s+/g, ' ').trim() : id.replace('view-', ''));
   }
   window.abrirCadastro = function (el) {
     document.body.classList.remove('modo-fluxo');
@@ -323,6 +346,7 @@
     if (!d) { alert('Documento ainda não foi importado para o Supabase.'); return; }
     const { data, error } = await sb.storage.from(BUCKET).createSignedUrl(d.storage_path, 300, { download: d.nome_arquivo });
     if (error) { alert('Erro ao gerar link: ' + error.message); return; }
+    registrar('download', 'Baixou ' + (d.descricao || d.nome_arquivo) + ' (' + d.nome_arquivo + ')');
     window.open(data.signedUrl, '_blank');
   };
 
@@ -887,13 +911,22 @@
 
   // ---------------------------------------------------------------- plano: solicitações com aprovação da administradora
   const AP = { sol: [], hist: [], uid: null };
-  const ROT = { status: 'Status', percentual: '% concluído', prazo: 'Prazo', observacoes: 'Observação' };
+  const ROT = { inicio: 'Início', prazo: 'Prazo', status: 'Status', percentual: '% concluído', observacoes: 'Observação' };
+  // todos os campos de uma ação (usados nas inclusões)
+  const ROT_ACAO = { fase: 'Fase / Área', prioridade: 'Prioridade', o_que: 'O quê?', por_que: 'Por quê?', onde: 'Onde?',
+    quem_area: 'Quem? (área)', quem: 'Quem? (colaborador)', gestor: 'Gestor', como: 'Como?', quanto: 'Custo',
+    inicio: 'Início', prazo: 'Prazo', status: 'Status', percentual: '% concluído', observacoes: 'Observação' };
   const fmtVal = (k, v) => v == null || v === '' ? '—'
     : k === 'percentual' ? v + '%'
-    : k === 'prazo' ? new Date(String(v).slice(0, 10) + 'T00:00').toLocaleDateString('pt-BR')
+    : k === 'prazo' || k === 'inicio' ? new Date(String(v).slice(0, 10) + 'T00:00').toLocaleDateString('pt-BR')
     : String(v);
   const fmtDataHora = d => new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  const snapshotAcao = a => a ? { status: a.status, percentual: a.percentual, prazo: a.prazo, observacoes: a.observacoes } : null;
+  const snapshotAcao = a => a ? { status: a.status, percentual: a.percentual, inicio: a.inicio, prazo: a.prazo, observacoes: a.observacoes } : null;
+  const fichaAcao = c => `<div class="pa-ficha">${Object.keys(ROT_ACAO).filter(k => c && c[k] != null && c[k] !== '')
+    .map(k => `<div><b>${ROT_ACAO[k]}</b><span>${esc(fmtVal(k, c[k]))}</span></div>`).join('')}</div>`;
+  const ehInclusao = h => h.origem === 'inclusao' || h.origem === 'inclusao_admin';
+  // desfazer de uma inclusão: "depois" vazio = ação removida
+  const ehRemocao = h => h.origem === 'desfazer' && h.depois && !Object.keys(h.depois).length;
   function diffHtml(antes, depois, so) {
     const chaves = so || Object.keys(ROT).filter(k => String((antes || {})[k] ?? '') !== String((depois || {})[k] ?? ''));
     return chaves.map(k => `<div><b>${ROT[k]}:</b> <span class="de">${esc(fmtVal(k, (antes || {})[k]))}</span> → <span class="para">${esc(fmtVal(k, (depois || {})[k]))}</span></div>`).join('')
@@ -956,6 +989,16 @@
     if (admin) {
       const pend = AP.sol.filter(x => x.situacao === 'pendente');
       const cards = pend.map(s => {
+        if (s.tipo === 'inclusao') return `<div class="pa-sol pa-sol-nova" data-sol="${s.id}">
+          <div class="pa-sol-top"><strong>➕ Nova ação proposta · ${esc(s.acao_titulo || '')}</strong>
+            <span>Solicitado por <b>${esc(s.solicitante_nome)}</b> em ${fmtDataHora(s.criado_em)}</span></div>
+          ${fichaAcao(s.campos)}
+          ${s.comentario ? `<div class="pa-sol-coment">💬 ${esc(s.comentario)}</div>` : ''}
+          <div class="pa-sol-acoes">
+            <input type="text" placeholder="Motivo / observação da decisão (opcional)" data-motivo>
+            <button class="pa-btn-ok" data-aprovar>✓ Aprovar e incluir</button>
+            <button class="pa-btn-no" data-recusar>✕ Recusar</button>
+          </div></div>`;
         const atual = snapshotAcao((S.acoes || []).find(a => a.numero === s.acao_numero));
         const mudou = atual && Object.keys(s.valores_anteriores || {}).some(k => String(atual[k] ?? '') !== String(s.valores_anteriores[k] ?? ''));
         return `<div class="pa-sol" data-sol="${s.id}">
@@ -972,14 +1015,19 @@
       }).join('') || '<div class="pa-aprov-vazio">Nenhuma solicitação aguardando aprovação.</div>';
 
       const origem = h => h.origem === 'aprovacao' ? `Aprovado · solicitado por ${esc(h.solicitante_nome || '—')}`
+        : h.origem === 'inclusao' ? `➕ Nova ação aprovada · solicitada por ${esc(h.solicitante_nome || '—')}`
+        : h.origem === 'inclusao_admin' ? '➕ Nova ação (inclusão direta)'
         : h.origem === 'edicao_admin' ? 'Edição direta' : '↩ Desfazer';
+      const mudancas = h => ehInclusao(h) ? `<div><b>Ação incluída no plano</b></div>${fichaAcao(h.depois)}`
+        : ehRemocao(h) ? '<div><b>Ação removida do plano</b> (inclusão desfeita)</div>'
+        : diffHtml(h.antes, h.depois);
       const linhas = AP.hist.map(h => `<tr class="${h.desfeito_em ? 'desfeito' : ''}">
           <td style="white-space:nowrap">${fmtDataHora(h.alterado_em)}</td>
           <td><b>${h.acao_numero}</b> · ${esc((h.acao_titulo || '').slice(0, 60))}</td>
           <td>${origem(h)}<div style="color:#999;font-size:11px">por ${esc(h.alterado_por_nome || '—')}</div></td>
-          <td><div class="pa-diff" style="margin:0">${diffHtml(h.antes, h.depois)}</div></td>
+          <td><div class="pa-diff" style="margin:0">${mudancas(h)}</div></td>
           <td style="white-space:nowrap">${h.desfeito_em ? `<span class="pa-sit cancelada">Desfeito ${fmtDataHora(h.desfeito_em)}</span>`
-            : h.origem === 'desfazer' ? '' : `<button class="pa-btn-no" data-desfazer="${h.id}">↩ Desfazer</button>`}</td></tr>`).join('');
+            : h.origem === 'desfazer' ? '' : `<button class="pa-btn-no" data-desfazer="${h.id}" data-rotulo="${ehInclusao(h) ? '↩ Remover ação' : '↩ Desfazer'}">${ehInclusao(h) ? '↩ Remover ação' : '↩ Desfazer'}</button>`}</td></tr>`).join('');
 
       box.innerHTML = `
         <div class="pa-aprov">
@@ -1009,13 +1057,14 @@
         <div class="pa-aprov-head"><h3>📨 Minhas solicitações de atualização</h3>
           <span style="font-size:11px;color:#888">As alterações entram no plano após aprovação da administradora</span></div>
         <div class="pa-aprov-cont">${minhas.map(s => `<div class="pa-sol" style="border-left-color:${s.situacao === 'aprovada' ? '#2E7D32' : s.situacao === 'recusada' ? '#B71C1C' : '#C9A839'}">
-            <div class="pa-sol-top"><strong>Ação ${s.acao_numero} · ${esc(s.acao_titulo || '')}</strong>
+            <div class="pa-sol-top"><strong>${s.tipo === 'inclusao' ? `➕ Nova ação${s.acao_numero ? ' ' + s.acao_numero : ''}` : 'Ação ' + s.acao_numero} · ${esc(s.acao_titulo || '')}</strong>
               <span class="pa-sit ${s.situacao}">${nomeSit[s.situacao]}</span></div>
-            <div class="pa-diff">${diffHtml(s.valores_anteriores, Object.assign({}, s.valores_anteriores, s.campos), Object.keys(s.campos))}</div>
+            ${s.tipo === 'inclusao' ? fichaAcao(s.campos)
+              : `<div class="pa-diff">${diffHtml(s.valores_anteriores, Object.assign({}, s.valores_anteriores, s.campos), Object.keys(s.campos))}</div>`}
             <div style="font-size:11px;color:#888">Enviada em ${fmtDataHora(s.criado_em)}${s.decidido_em && s.situacao !== 'cancelada' ? ` · decidida por ${esc(s.decidido_por_nome || '')} em ${fmtDataHora(s.decidido_em)}` : ''}</div>
             ${s.motivo_decisao ? `<div class="pa-sol-coment">Retorno: ${esc(s.motivo_decisao)}</div>` : ''}
             ${s.situacao === 'pendente' ? `<div class="pa-sol-acoes"><button class="pa-btn-no" data-cancelar="${s.id}">Cancelar solicitação</button></div>` : ''}
-          </div>`).join('') || '<div class="pa-aprov-vazio">Você ainda não enviou solicitações. Use “Solicitar atualização” na ação desejada.</div>'}</div></div>`;
+          </div>`).join('') || '<div class="pa-aprov-vazio">Você ainda não enviou solicitações. Use “Solicitar atualização” na ação desejada ou “+ Nova ação” para propor uma ação.</div>'}</div></div>`;
       box.querySelectorAll('[data-cancelar]').forEach(b => b.onclick = async () => {
         const { error } = await sb.rpc('cancelar_solicitacao_plano', { p_id: +b.dataset.cancelar });
         if (error) return avisoPlano('Erro: ' + msgErro(error), true);
@@ -1025,11 +1074,36 @@
     }
   }
 
-  let formPlano = { num: null, admin: false };
+  let formPlano = { num: null, admin: false, nova: false };
+  const CAMPOS_NOVA = { fase: 'pa-f-fase', prioridade: 'pa-f-prio', o_que: 'pa-f-oque', por_que: 'pa-f-porque', onde: 'pa-f-onde',
+    quem_area: 'pa-f-quemarea', quem: 'pa-f-quem', gestor: 'pa-f-gestor', como: 'pa-f-como', quanto: 'pa-f-quanto' };
+  window.abrirNovaAcao = function () {
+    if (!pode('plano5w2h')) return;
+    const admin = !!(S.acesso && S.acesso.admin);
+    formPlano = { num: null, admin, nova: true };
+    $('pa-form').reset();
+    const fase = $('pa-f-fase');
+    fase.innerHTML = (S.fases || []).map(f => `<option>${esc(f.nome)}</option>`).join('');
+    $('pa-f-novos').hidden = false;
+    $('pa-modal-eyebrow').textContent = admin ? 'Nova ação (inclusão direta)' : 'Propor nova ação';
+    $('pa-modal-titulo').textContent = 'Nova ação no plano 5W2H';
+    $('pa-modal-sub').textContent = admin
+      ? 'Como administradora, a ação entra no plano na hora e fica no histórico, com opção de remover.'
+      : 'A ação só entra no plano depois de aprovada pela administradora (Layanne Santos · Compliance). Campos com * são obrigatórios.';
+    $('pa-f-status').value = 'Não iniciado';
+    $('pa-f-pct').value = 0;
+    $('pa-f-coment-box').hidden = admin;
+    $('pa-f-enviar').textContent = admin ? 'Incluir ação' : 'Enviar para aprovação';
+    $('pa-f-erro').textContent = '';
+    $('pa-modal').hidden = false;
+    setTimeout(() => $('pa-f-oque').focus(), 50);
+  };
   function abrirFormPlano(num, comoAdmin) {
     const a = (S.acoes || []).find(x => x.numero === num);
     if (!a) return;
-    formPlano = { num, admin: comoAdmin };
+    formPlano = { num, admin: comoAdmin, nova: false };
+    $('pa-f-novos').hidden = true;
+    $('pa-f-inicio').value = a.inicio || '';
     $('pa-modal-eyebrow').textContent = comoAdmin ? 'Editar ação (aplica imediatamente)' : 'Solicitar atualização';
     $('pa-modal-titulo').textContent = `Ação ${a.numero} · ${a.o_que}`;
     $('pa-modal-sub').textContent = comoAdmin
@@ -1049,20 +1123,36 @@
   $('pa-form').addEventListener('submit', async e => {
     e.preventDefault();
     const campos = {
+      inicio: $('pa-f-inicio').value || null,
       status: $('pa-f-status').value,
       percentual: Math.max(0, Math.min(100, parseInt($('pa-f-pct').value || '0', 10))),
       prazo: $('pa-f-prazo').value || null,
       observacoes: $('pa-f-obs').value.trim() || null
     };
     if (campos.status === 'Concluído' && campos.percentual < 100) campos.percentual = 100;
+    if (campos.inicio && campos.prazo && campos.prazo < campos.inicio) {
+      $('pa-f-erro').textContent = 'O prazo não pode ser anterior à data de início.'; return;
+    }
+    if (formPlano.nova) {
+      Object.entries(CAMPOS_NOVA).forEach(([k, id]) => { campos[k] = $(id).value.trim() || null; });
+      if (!campos.o_que) { $('pa-f-erro').textContent = 'Informe o que será feito (O quê?).'; return; }
+      if (!campos.quem && !campos.quem_area) { $('pa-f-erro').textContent = 'Informe o responsável (área ou colaborador).'; return; }
+    }
     $('pa-f-enviar').disabled = true;
-    const { error } = formPlano.admin
-      ? await sb.rpc('editar_acao_plano', { p_numero: formPlano.num, p_campos: campos })
-      : await sb.rpc('solicitar_alteracao_plano', { p_numero: formPlano.num, p_campos: campos, p_comentario: $('pa-f-coment').value });
+    const coment = $('pa-f-coment').value;
+    const { error } = formPlano.nova
+      ? (formPlano.admin ? await sb.rpc('incluir_acao_plano', { p_campos: campos })
+        : await sb.rpc('solicitar_inclusao_acao', { p_campos: campos, p_comentario: coment }))
+      : formPlano.admin
+        ? await sb.rpc('editar_acao_plano', { p_numero: formPlano.num, p_campos: campos })
+        : await sb.rpc('solicitar_alteracao_plano', { p_numero: formPlano.num, p_campos: campos, p_comentario: coment });
     $('pa-f-enviar').disabled = false;
     if (error) { $('pa-f-erro').textContent = msgErro(error); return; }
     $('pa-modal').hidden = true;
-    avisoPlano(formPlano.admin ? 'Ação atualizada. A alteração está no histórico, com opção de desfazer.'
+    avisoPlano(formPlano.nova
+      ? (formPlano.admin ? 'Nova ação incluída no plano. Ela está no histórico, com opção de remover.'
+        : 'Nova ação enviada. Ela entra no plano assim que a administradora aprovar.')
+      : formPlano.admin ? 'Ação atualizada. A alteração está no histórico, com opção de desfazer.'
       : 'Solicitação enviada. O plano será atualizado assim que a administradora aprovar.');
     await recarregarPlano();
   });
@@ -1077,7 +1167,8 @@
     card.querySelectorAll('button').forEach(b => { b.disabled = true; });
     const { error } = await sb.rpc('decidir_solicitacao_plano', { p_id: id, p_aprovar: aprovar, p_motivo: motivo || null });
     if (error) { card.querySelectorAll('button').forEach(b => { b.disabled = false; }); return avisoPlano('Erro: ' + msgErro(error), true); }
-    avisoPlano(aprovar ? 'Alteração aprovada e aplicada ao plano.' : 'Solicitação recusada. O plano não foi alterado.');
+    avisoPlano(aprovar ? (card.classList.contains('pa-sol-nova') ? 'Nova ação aprovada e incluída no plano.' : 'Alteração aprovada e aplicada ao plano.')
+      : 'Solicitação recusada. O plano não foi alterado.');
     await recarregarPlano();
   }
 
@@ -1085,13 +1176,14 @@
     if (botao.dataset.confirmar !== '1') {
       botao.dataset.confirmar = '1';
       botao.textContent = 'Confirmar desfazer?';
-      setTimeout(() => { if (botao.isConnected) { botao.dataset.confirmar = ''; botao.textContent = '↩ Desfazer'; } }, 4000);
+      setTimeout(() => { if (botao.isConnected) { botao.dataset.confirmar = ''; botao.textContent = botao.dataset.rotulo || '↩ Desfazer'; } }, 4000);
       return;
     }
     botao.disabled = true;
     const { error } = await sb.rpc('desfazer_alteracao_plano', { p_hist: id });
     if (error) { botao.disabled = false; return avisoPlano('Erro: ' + msgErro(error), true); }
-    avisoPlano('Alteração desfeita: a ação voltou ao estado anterior.');
+    avisoPlano(/Remover/.test(botao.dataset.rotulo || '') ? 'Inclusão desfeita: a ação foi removida do plano.'
+      : 'Alteração desfeita: a ação voltou ao estado anterior.');
     await recarregarPlano();
   }
 
@@ -1180,6 +1272,7 @@
       S.documentos.plano_5w2h_xlsx = doc;
       const novas = await buscar('plano_acao', 'numero');
       renderPlano5w2h(S.fases, novas);
+      registrar('importacao', `Plano de ação substituído pela planilha "${arquivo.name}" (${novas.length} ações)`);
       msg(`Plano atualizado: ${novas.length} ações importadas e planilha "${arquivo.name}" disponível em BAIXAR EXCEL.`);
     } catch (e) {
       excelPendente = null;
@@ -1335,6 +1428,7 @@
     // administração
     $('sb-admin-grupo').hidden = !a.admin;
     $('pa-btn-importar').hidden = !a.admin;
+    $('pa-btn-nova').hidden = !pode('plano5w2h');
     $('sb-usuario').textContent = (a.nome || '') + (a.admin ? ' · Administradora' : a.perfil ? ' · ' + a.perfil : '');
 
     if (temDoc && primeira) {
@@ -1357,6 +1451,58 @@
     mostrarVista('view-admin');
     limparAtivos(); if (el) el.classList.add('sb-active');
     await admCarregar();
+  };
+
+  // ---------------------------------------------------------------- registro de acessos (auditoria) — somente administradores
+  const AU = { linhas: [] };
+  const AU_EVENTOS = { login: ['Entrada', '#1B5E20', '#D6EDD9'], logout: ['Saída', '#525252', '#EEE'], consulta: ['Consulta', '#0D47A1', '#DCE8F7'],
+    download: ['Download', '#6A1B9A', '#EDE0F3'], alteracao: ['Alteração', '#B71C1C', '#FFE0E0'], importacao: ['Importação', '#E65100', '#FFE9D6'],
+    senha: ['Senha', '#7D6608', '#FFF3C4'] };
+  window.abrirAuditoria = async function (el) {
+    if (!S.acesso || !S.acesso.admin) return;
+    mostrarVista('view-auditoria');
+    limparAtivos(); if (el) el.classList.add('sb-active');
+    const usuarios = await buscar('usuarios', 'nome').catch(() => []);
+    const sel = $('au-usuario'), atual = sel.value;
+    sel.innerHTML = '<option value="">Todos</option>' + usuarios.map(u => `<option value="${u.user_id}">${esc(u.nome || u.email)}</option>`).join('');
+    sel.value = atual;
+    if (!$('au-de').value) $('au-de').value = new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+    carregarAuditoria();
+  };
+  window.carregarAuditoria = async function () {
+    $('au-rodape').textContent = 'Carregando…';
+    let q = sb.from('auditoria').select('id,criado_em,user_id,usuario,email,evento,detalhe,navegador')
+      .order('criado_em', { ascending: false }).limit(1000);
+    if ($('au-usuario').value) q = q.eq('user_id', $('au-usuario').value);
+    if ($('au-evento').value) q = q.eq('evento', $('au-evento').value);
+    if ($('au-de').value) q = q.gte('criado_em', new Date($('au-de').value + 'T00:00').toISOString());
+    if ($('au-ate').value) q = q.lte('criado_em', new Date($('au-ate').value + 'T23:59:59').toISOString());
+    const { data, error } = await q;
+    if (error) { $('au-rodape').textContent = 'Erro: ' + error.message; return; }
+    AU.linhas = data || [];
+    const conta = ev => AU.linhas.filter(l => l.evento === ev).length;
+    const kpi = (n, t) => `<div class="au-kpi"><strong>${fmtN(n)}</strong><span>${t}</span></div>`;
+    $('au-kpis').innerHTML = kpi(new Set(AU.linhas.map(l => l.user_id)).size, 'Usuários') + kpi(conta('login'), 'Entradas')
+      + kpi(conta('consulta'), 'Consultas') + kpi(conta('download') + conta('importacao'), 'Downloads / importações') + kpi(conta('alteracao'), 'Alterações');
+    $('au-linhas').innerHTML = AU.linhas.map(l => {
+      const [rot, cor, fundo] = AU_EVENTOS[l.evento] || [l.evento, '#525252', '#EEE'];
+      return `<tr><td style="white-space:nowrap">${fmtDataHora(l.criado_em)}</td>
+        <td><b>${esc(l.usuario || '—')}</b><div style="font-size:11px;color:var(--cinza-medio)">${esc(l.email || '')}</div></td>
+        <td><span class="au-ev" style="color:${cor};background:${fundo}">${rot}</span></td>
+        <td style="font-size:12px">${esc(l.detalhe || '')}</td></tr>`;
+    }).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--cinza-medio)">Nenhum registro no período.</td></tr>';
+    $('au-rodape').textContent = `${fmtN(AU.linhas.length)} registro(s)` + (AU.linhas.length === 1000 ? ' — exibindo os 1.000 mais recentes; refine o filtro.' : '');
+  };
+  window.exportarAuditoria = function () {
+    const cel = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const linhas = [['Data/hora', 'Usuário', 'E-mail', 'Evento', 'Detalhe', 'Navegador']].concat(AU.linhas.map(l =>
+      [fmtDataHora(l.criado_em), l.usuario, l.email, (AU_EVENTOS[l.evento] || [l.evento])[0], l.detalhe, l.navegador]));
+    const blob = new Blob(['﻿' + linhas.map(r => r.map(cel).join(';')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'Registro_de_acessos_' + new Date().toISOString().slice(0, 10) + '.csv';
+    a.click();
+    registrar('download', `Exportou o registro de acessos (${AU.linhas.length} linhas)`);
   };
 
   async function admCarregar() {
