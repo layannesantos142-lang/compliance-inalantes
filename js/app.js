@@ -971,6 +971,13 @@
       const num = +td.dataset.num;
       const pend = AP.sol.filter(x => x.situacao === 'pendente' && x.acao_numero === num);
       if (!pode('plano5w2h')) { td.innerHTML = ''; return; }
+      const acao = (S.acoes || []).find(a => a.numero === num);
+      if (acao && acao.status === 'Concluído') {
+        // ação concluída não pode ser editada: a continuidade é feita com uma nova ação
+        td.innerHTML = `<span class="pa-trava" title="Ação concluída: não pode ser editada">🔒 Concluída</span>
+          <button class="pa-upd-btn" data-continuar="${num}" title="Incluir uma nova ação dando continuidade a esta">+ Nova ação</button>`;
+        return;
+      }
       if (admin) {
         td.innerHTML = `<button class="pa-upd-btn" data-editar="${num}">✎ Editar</button>` +
           (pend.length ? `<div class="pa-pend-tag">⏳ ${pend.length} para aprovar</div>` : '');
@@ -982,6 +989,7 @@
     });
     document.querySelectorAll('#pa-acoes [data-editar]').forEach(b => b.onclick = () => abrirFormPlano(+b.dataset.editar, true));
     document.querySelectorAll('#pa-acoes [data-solicitar]').forEach(b => b.onclick = () => abrirFormPlano(+b.dataset.solicitar, false));
+    document.querySelectorAll('#pa-acoes [data-continuar]').forEach(b => b.onclick = () => abrirNovaAcao(+b.dataset.continuar));
   }
 
   function renderAprovacoes() {
@@ -1078,8 +1086,9 @@
   let formPlano = { num: null, admin: false, nova: false };
   const CAMPOS_NOVA = { fase: 'pa-f-fase', prioridade: 'pa-f-prio', o_que: 'pa-f-oque', por_que: 'pa-f-porque', onde: 'pa-f-onde',
     quem_area: 'pa-f-quemarea', quem: 'pa-f-quem', gestor: 'pa-f-gestor', como: 'pa-f-como', quanto: 'pa-f-quanto' };
-  window.abrirNovaAcao = function () {
+  window.abrirNovaAcao = function (continuarDe) {
     if (!pode('plano5w2h')) return;
+    const base = typeof continuarDe === 'number' ? (S.acoes || []).find(a => a.numero === continuarDe) : null;
     const admin = !!(S.acesso && S.acesso.admin);
     formPlano = { num: null, admin, nova: true };
     $('pa-form').reset();
@@ -1093,6 +1102,12 @@
       : 'A ação só entra no plano depois de aprovada pela administradora (Layanne Santos · Compliance). Campos com * são obrigatórios.';
     $('pa-f-status').value = 'Não iniciado';
     $('pa-f-pct').value = 0;
+    if (base) {
+      // continuidade de uma ação concluída: aproveita fase, responsáveis e local; o "O quê?" fica em branco
+      ['fase', 'prioridade', 'onde', 'quem_area', 'quem', 'gestor', 'quanto'].forEach(k => { if (base[k] != null) $(CAMPOS_NOVA[k]).value = base[k]; });
+      $('pa-f-obs').value = `Continuidade da ação ${base.numero} (concluída)`;
+      $('pa-modal-titulo').textContent = `Nova ação — continuidade da ação ${base.numero}`;
+    }
     $('pa-f-coment-box').hidden = admin;
     $('pa-f-enviar').textContent = admin ? 'Incluir ação' : 'Enviar para aprovação';
     $('pa-f-erro').textContent = '';
