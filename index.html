@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Compliance — Inalantes e Produtos Perigosos</title>
-<link rel="stylesheet" href="css/estilo.css?v=2026100601">
+<link rel="stylesheet" href="css/estilo.css?v=2026100603">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js?v=2026100601"></script>
@@ -157,6 +157,9 @@
         </div>
       </div>
     </div>
+    <div id="pa-aprov-msg" class="adm-aviso" hidden></div>
+    <div id="pa-aprov-box"></div>
+
     <div class="pa-table-wrap">
       <div class="pa-table-head">
         <h3>Resumo de Todas as Ações</h3>
@@ -165,7 +168,7 @@
       <div style="overflow-x:auto">
         <table class="pa-tbl">
           <thead><tr>
-            <th>#</th><th>Prioridade</th><th>O Quê? (What)</th><th>Por Quê? (Why)</th><th>Onde? (Where)</th>
+            <th>#</th><th>Atualizar</th><th>Prioridade</th><th>O Quê? (What)</th><th>Por Quê? (Why)</th><th>Onde? (Where)</th>
             <th>Quem? (Who)</th><th>Como? (How)</th><th>Custo</th><th>Gestor</th><th>Início</th><th>Prazo</th><th>Status</th><th>%</th>
           </tr></thead>
           <tbody id="pa-acoes"></tbody>
@@ -174,6 +177,36 @@
     </div>
     <div class="pa-footer">FERREIRA COSTA HOME CENTER · Compliance | Governança Corporativa · Documento de Uso Interno · <span data-param="plano_data_versao"></span></div>
   </div>
+</div>
+
+<!-- ============ JANELA: SOLICITAR / EDITAR ATUALIZAÇÃO DE AÇÃO ============ -->
+<div class="pa-modal" id="pa-modal" hidden>
+  <form class="pa-modal-box" id="pa-form">
+    <div class="pa-modal-eyebrow" id="pa-modal-eyebrow">Solicitar atualização</div>
+    <h3 id="pa-modal-titulo"></h3>
+    <p class="pa-modal-sub" id="pa-modal-sub"></p>
+    <div class="pa-modal-grid">
+      <div><label class="adm-lb">Status</label>
+        <select class="adm-in" id="pa-f-status">
+          <option>Não iniciado</option><option>Em andamento</option><option>Concluído</option><option>Atrasado</option><option>Cancelado</option>
+        </select></div>
+      <div><label class="adm-lb">% concluído</label>
+        <input class="adm-in" id="pa-f-pct" type="number" min="0" max="100" step="5"></div>
+      <div><label class="adm-lb">Prazo</label>
+        <input class="adm-in" id="pa-f-prazo" type="date"></div>
+    </div>
+    <label class="adm-lb">Observação da ação</label>
+    <textarea class="adm-in" id="pa-f-obs" rows="2" placeholder="Ex.: aguardando retorno de férias do responsável"></textarea>
+    <div id="pa-f-coment-box">
+      <label class="adm-lb">Justificativa para a aprovação</label>
+      <textarea class="adm-in" id="pa-f-coment" rows="2" placeholder="Explique o que foi feito ou por que o prazo mudou"></textarea>
+    </div>
+    <div class="login-erro" id="pa-f-erro"></div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn-pdf" type="submit" id="pa-f-enviar">Enviar para aprovação</button>
+      <button class="btn-limpar" type="button" onclick="document.getElementById('pa-modal').hidden=true">Cancelar</button>
+    </div>
+  </form>
 </div>
 
 <!-- ============ VISTA: ETAPA 02 — RECEBIMENTO ============ -->
@@ -796,6 +829,6 @@
   </div>
 </div>
 
-<script src="js/app.js?v=2026100602"></script>
+<script src="js/app.js?v=2026100603"></script>
 </body>
 </html>
