@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Compliance — Inalantes e Produtos Perigosos</title>
-<link rel="stylesheet" href="css/estilo.css?v=2026100607">
+<link rel="stylesheet" href="css/estilo.css?v=2026100608">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js?v=2026100601"></script>
@@ -93,6 +93,9 @@
     <button class="sb-btn sb-btn-tema" id="btn-tema" onclick="alternarTema()" title="Alternar entre modo claro e escuro">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 000 18z" fill="currentColor"/></svg>
       <span id="btn-tema-txt">Modo escuro</span>
+    </button>
+    <button class="sb-btn sb-btn-notif" id="btn-notif" onclick="abrirNotificacoes()" hidden title="Respostas às suas solicitações do plano de ação">
+      🔔 Notificações <span class="notif-n" id="notif-n"></span>
     </button>
     <button class="sb-btn sb-btn-tema" onclick="abrirTrocaSenha(false)">Alterar minha senha</button>
     <button class="sb-btn sb-btn-tema" onclick="sair()">Sair</button>
@@ -234,6 +237,20 @@
       <button class="btn-limpar" type="button" onclick="document.getElementById('pa-modal').hidden=true">Cancelar</button>
     </div>
   </form>
+</div>
+
+<!-- ============ JANELA: NOTIFICAÇÕES DO SOLICITANTE ============ -->
+<div class="pa-modal" id="notif-modal" hidden>
+  <div class="pa-modal-box">
+    <div class="pa-modal-eyebrow">Notificações</div>
+    <h3>Respostas às suas solicitações</h3>
+    <p class="pa-modal-sub">A administradora (Layanne Santos · Compliance) analisou as solicitações abaixo.</p>
+    <div id="notif-lista" style="display:flex;flex-direction:column;gap:10px;margin-top:12px"></div>
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+      <button class="btn-pdf" type="button" onclick="fecharNotificacoes(true)">Ver no plano de ação</button>
+      <button class="btn-limpar" type="button" onclick="fecharNotificacoes(false)">Marcar como lidas e fechar</button>
+    </div>
+  </div>
 </div>
 
 <!-- ============ VISTA: ETAPA 02 — RECEBIMENTO ============ -->
@@ -905,6 +922,6 @@
   </div>
 </div>
 
-<script src="js/app.js?v=2026100607"></script>
+<script src="js/app.js?v=2026100608"></script>
 </body>
 </html>
