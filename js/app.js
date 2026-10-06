@@ -216,6 +216,7 @@
         document.querySelector('#tela-carregando .spinner').hidden = true;
         return;
       }
+      sb.rpc('manter_ativo', { p_origem: 'acesso-usuario' }).then(() => {}, () => {});
       registrar('login', loginNovo ? 'Entrou com e-mail e senha' : 'Retomou a sessão salva no navegador',
         { perfil: S.acesso.admin ? 'Administradora' : S.acesso.perfil || null });
       const [param, filiais, familias, classes, produtos, normas, comparativos, blocos, requisitos, incompat,
