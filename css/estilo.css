@@ -448,6 +448,14 @@ body.modo-fluxo .fluxo-view.ativa{display:block}
 .pa-modal-grid4{grid-template-columns:1fr 1.2fr .7fr 1fr}
 .pa-modal-box{width:min(640px,100%)}
 @media(max-width:560px){.pa-modal-grid,.pa-modal-grid4{grid-template-columns:1fr}}
+.sb-btn-notif{background:#FFF3C4;color:#7D6608;border:1px solid #E8C547;font-weight:700;animation:fx-notif 1.6s ease-in-out infinite}
+.notif-n{display:inline-block;min-width:20px;padding:1px 6px;border-radius:10px;background:#BD2335;color:#fff;font-size:11px;margin-left:4px}
+@keyframes fx-notif{0%,100%{box-shadow:0 0 0 0 rgba(232,197,71,.6)}50%{box-shadow:0 0 0 6px rgba(232,197,71,0)}}
+.notif-item{border:1px solid #e8e0d8;border-left:4px solid #2E7D32;border-radius:8px;padding:10px 14px;background:#F6FBF6;font-size:13px;line-height:1.5}
+.notif-item.no{border-left-color:#B71C1C;background:#FFF7F7}
+.notif-sit{font-size:11px;font-weight:800;letter-spacing:.5px;color:#1B5E20}
+.notif-item.no .notif-sit{color:#B71C1C}
+.notif-motivo{margin-top:4px;padding:6px 10px;background:rgba(0,0,0,.04);border-radius:6px;font-size:12px}
 .pa-trava{display:block;font-size:11px;font-weight:700;color:#1B5E20;white-space:nowrap;margin-bottom:4px}
 .pa-sol-nova{border-left-color:#1565C0;background:#F7FAFF}
 .pa-ficha{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px 14px;margin:8px 0;font-size:12px}
