@@ -405,15 +405,21 @@ body.modo-fluxo .fluxo-view.ativa{display:block}
 .pa-tbl th{padding:9px 12px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid #e8e0d8;white-space:nowrap}
 .pa-tbl td{padding:11px 12px;border-bottom:1px solid #F0ECE8;vertical-align:top;color:#333}
 /* 14 colunas cabendo na largura da tela (sem cortar o Status e o %) */
-.pa-tbl{table-layout:fixed;min-width:1080px;font-size:12px}
-.pa-tbl th,.pa-tbl td{padding:9px 6px;overflow-wrap:anywhere}
-.pa-tbl th{white-space:normal;line-height:1.3}
-.pa-tbl th:nth-child(1){width:2.5%}  .pa-tbl th:nth-child(2){width:8.5%}  .pa-tbl th:nth-child(3){width:5.5%}
-.pa-tbl th:nth-child(4){width:12%}   .pa-tbl th:nth-child(5){width:11%}   .pa-tbl th:nth-child(6){width:6%}
-.pa-tbl th:nth-child(7){width:8%}    .pa-tbl th:nth-child(8){width:11%}   .pa-tbl th:nth-child(9){width:5%}
-.pa-tbl th:nth-child(10){width:5.5%} .pa-tbl th:nth-child(11){width:6.5%} .pa-tbl th:nth-child(12){width:7%}
-.pa-tbl th:nth-child(13){width:7.5%} .pa-tbl th:nth-child(14){width:4%}
-.pa-tbl td:nth-child(11),.pa-tbl td:nth-child(12){overflow-wrap:normal}
+.pa-tbl{table-layout:fixed;min-width:860px;font-size:11.5px}
+.pa-tbl th,.pa-tbl td{padding:8px 4px}
+.pa-tbl td{overflow-wrap:anywhere;hyphens:auto;-webkit-hyphens:auto}
+.pa-tbl th{white-space:normal;line-height:1.3;font-size:9px;letter-spacing:.2px;overflow-wrap:normal;word-break:normal}
+.pa-tbl th:nth-child(1){width:2.5%}  .pa-tbl th:nth-child(2){width:8%}    .pa-tbl th:nth-child(3){width:7%}
+.pa-tbl th:nth-child(4){width:11.5%} .pa-tbl th:nth-child(5){width:9%}    .pa-tbl th:nth-child(6){width:6%}
+.pa-tbl th:nth-child(7){width:8%}    .pa-tbl th:nth-child(8){width:9.5%}  .pa-tbl th:nth-child(9){width:6%}
+.pa-tbl th:nth-child(10){width:5.5%} .pa-tbl th:nth-child(11){width:7.5%} .pa-tbl th:nth-child(12){width:7.5%}
+.pa-tbl th:nth-child(13){width:8%}   .pa-tbl th:nth-child(14){width:4%}
+.pa-tbl td:nth-child(11),.pa-tbl td:nth-child(12){overflow-wrap:normal;font-size:11px}
+.pa-tbl td:nth-child(12) *{white-space:normal}
+.pa-tbl td:nth-child(9){overflow-wrap:normal;font-size:11px}
+.pa-tbl td:nth-child(14){white-space:nowrap;font-size:10.5px;padding-left:2px;padding-right:2px;text-align:center}
+.pa-tbl td .pb{overflow-wrap:normal;word-break:normal;font-size:9.5px;padding:3px 7px}
+.pa-tbl td:first-child,.pa-tbl th:first-child{padding-left:8px}
 .pa-tbl .pb{white-space:normal;display:inline-block;line-height:1.25;text-align:center}
 .pa-tbl .pa-upd-btn{padding:5px 8px;font-size:11px}
 .pa-tbl .pa-trava{white-space:normal}
