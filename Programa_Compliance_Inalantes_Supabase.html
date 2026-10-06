@@ -1,0 +1,784 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Compliance — Inalantes e Produtos Perigosos</title>
+<link rel="stylesheet" href="css/estilo.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div class="overlay" id="tela-login" hidden>
+  <form class="login-box" id="form-login">
+    <div class="sb-logo">FC</div>
+    <h2>Compliance · Inalantes</h2>
+    <p>Documento confidencial. Entre com seu usuário para carregar os dados.</p>
+    <div class="login-contato">
+      Não tem acesso ou esqueceu a senha? Fale com a responsável:<br>
+      <strong>Layanne Santos</strong> · Compliance<br>
+      <a href="mailto:layanne.santos@ferreiracosta.com.br?subject=Acesso%20ao%20Compliance%20Inalantes">layanne.santos@ferreiracosta.com.br</a>
+    </div>
+    <label for="login-email">E-mail</label>
+    <input type="email" id="login-email" autocomplete="username" required>
+    <label for="login-senha">Senha</label>
+    <input type="password" id="login-senha" autocomplete="current-password" required>
+    <button type="submit">Entrar</button>
+    <div class="login-erro" id="login-erro"></div>
+  </form>
+</div>
+
+<!-- ============ CARREGANDO ============ -->
+<div class="overlay" id="tela-carregando" hidden>
+  <div style="text-align:center">
+    <div class="spinner"></div>
+    <div style="font-size:13px;color:var(--cinza-medio)" id="carregando-msg">Carregando dados do Supabase…</div>
+  </div>
+</div>
+
+<button class="sb-toggle" onclick="document.body.classList.toggle('sb-aberta')" aria-label="Abrir menu">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+</button>
+
+<!-- ============ BARRA LATERAL ============ -->
+<aside class="sb">
+  <div class="sb-scroll">
+    <button class="sb-collapse" onclick="document.body.classList.toggle('sb-min')" aria-label="Minimizar ou maximizar menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 6l-6 6 6 6"/></svg>
+    </button>
+    <div class="sb-brand">
+      <div class="sb-logo">FC</div>
+      <div><h2>Compliance</h2><p>Inalantes · <span data-param="doc_ano"></span></p></div>
+    </div>
+    <div class="sb-pill">Diagnóstico de Conformidade</div>
+    <div class="sb-group">Fluxo do Produto</div>
+    <div id="sb-etapas"></div>
+    <div id="sb-admin-grupo" hidden>
+      <div class="sb-group">Administração</div>
+      <button class="sb-steprow" style="--c:#525252" onclick="abrirAdmin(this)">
+        <span class="sb-chip">⚙</span><span class="sb-steptxt">Usuários e acessos</span>
+      </button>
+    </div>
+  </div>
+  <div class="sb-foot">
+    <div class="sb-meta"><span>Usuário</span><span id="sb-usuario" style="text-align:right;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span></div>
+    <div class="sb-meta"><span>Status</span><span data-param="doc_status"></span></div>
+    <div class="sb-meta"><span>Etapas</span><span id="sb-etapas-cont"></span></div>
+    <button class="sb-btn sb-btn-pdf" onclick="window.print()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6M6 18H4v-7h16v7h-2M8 14h8v6H8z"/></svg>
+      Exportar PDF
+    </button>
+    <button class="sb-btn sb-btn-tema" id="btn-tema" onclick="alternarTema()" title="Alternar entre modo claro e escuro">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 000 18z" fill="currentColor"/></svg>
+      <span id="btn-tema-txt">Modo escuro</span>
+    </button>
+    <button class="sb-btn sb-btn-tema" onclick="sair()">Sair</button>
+  </div>
+</aside>
+
+<!-- ============ VISTA: PLANO DE AÇÃO 5W2H ============ -->
+<div id="view-plano-acao" class="fluxo-view">
+  <div class="rbh">
+    <div class="rbh-topo">
+      <span data-param="doc_confidencialidade"></span>
+      <div class="rbh-topo-r">
+        <button class="rbh-pdf" onclick="fecharPlanoAcao()" style="background:#525252">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg> VOLTAR
+        </button>
+        <button class="rbh-pdf" onclick="window.print()">SALVAR PDF</button>
+        <button class="rbh-pdf" onclick="baixarDocumento('plano_5w2h_xlsx')" style="background:#1D6F42">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15V3"/><path d="M7 10l5 5 5-5"/><path d="M3 20h18"/></svg> BAIXAR EXCEL
+        </button>
+        <input type="file" id="pa-xlsx-input" accept=".xlsx,.xls" hidden>
+        <button class="rbh-pdf" id="pa-btn-importar" onclick="document.getElementById('pa-xlsx-input').click()" style="background:#0D47A1" title="Somente administradores: substitui o plano pelas ações da planilha e atualiza o arquivo de download" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="M7 8l5-5 5 5"/><path d="M3 20h18"/></svg> ATUALIZAR PELO EXCEL
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="pa-wrap">
+    <div id="pa-import-msg" hidden style="padding:12px 16px;border-radius:8px;font-size:13px;font-weight:600;margin-bottom:16px"></div>
+    <div class="pa-hero">
+      <div>
+        <h1>Plano de Ação — Metodologia 5W2H</h1>
+        <p>Monitoramento do Projeto · Ferreira Costa Home Center</p>
+      </div>
+      <div class="pa-hero-meta">
+        <div><span>Tema / Projeto</span><br><strong data-param="plano_tema"></strong></div>
+        <div><span>Área Demandante</span><br><strong data-param="plano_area"></strong></div>
+        <div><span>Elaborado por</span><br><strong data-param="plano_elaborado_por"></strong></div>
+        <div><span>Data / Versão</span><br><strong data-param="plano_data_versao"></strong></div>
+      </div>
+    </div>
+    <div class="pa-kpis" id="pa-kpis"></div>
+    <div class="pa-progress-box">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <div class="title">Progresso Geral</div>
+        <div style="font-size:12px;color:#aaa;font-style:italic">Média do percentual de conclusão das ações</div>
+      </div>
+      <div style="display:flex;align-items:center">
+        <div class="pa-bar-outer"><div class="pa-bar-inner" id="pa-barra" style="width:0%"></div></div>
+        <span class="pa-bar-pct" id="pa-barra-pct">0%</span>
+      </div>
+    </div>
+    <div class="pa-cols">
+      <div class="pa-card">
+        <div class="pa-card-head">Evolução por Fase / Área</div>
+        <table class="pa-fase-table">
+          <thead><tr><th style="text-align:left">Fase / Área</th><th>Total</th><th>Conc.</th><th>Atraso</th></tr></thead>
+          <tbody id="pa-fases"></tbody>
+        </table>
+      </div>
+      <div class="pa-card">
+        <div class="pa-card-head">Distribuição por Status</div>
+        <div class="pa-chart-wrap">
+          <canvas id="paStatusChart" width="160" height="160" style="max-width:160px;max-height:160px"></canvas>
+          <div class="pa-legend" id="pa-legenda"></div>
+        </div>
+      </div>
+    </div>
+    <div class="pa-table-wrap">
+      <div class="pa-table-head">
+        <h3>Resumo de Todas as Ações</h3>
+        <span id="pa-resumo" style="background:rgba(255,255,255,.15);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="pa-tbl">
+          <thead><tr>
+            <th>#</th><th>Prioridade</th><th>O Quê? (What)</th><th>Por Quê? (Why)</th><th>Onde? (Where)</th>
+            <th>Quem? (Who)</th><th>Como? (How)</th><th>Custo</th><th>Gestor</th><th>Início</th><th>Prazo</th><th>Status</th><th>%</th>
+          </tr></thead>
+          <tbody id="pa-acoes"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="pa-footer">FERREIRA COSTA HOME CENTER · Compliance | Governança Corporativa · Documento de Uso Interno · <span data-param="plano_data_versao"></span></div>
+  </div>
+</div>
+
+<!-- ============ VISTA: ETAPA 02 — RECEBIMENTO ============ -->
+<div id="view-recebimento" class="fluxo-view">
+  <div class="rbh">
+    <div class="rbh-topo">
+      <span data-param="doc_confidencialidade"></span>
+      <div class="rbh-topo-r">
+        <button class="rbh-pdf" onclick="window.print()">SALVAR PDF</button>
+        <button class="rbh-pdf" onclick="abrirPlanoAcao()" style="background:var(--verde)">PLANO DE AÇÃO</button>
+      </div>
+    </div>
+    <div class="rbh-corpo">
+      <div class="rbh-eyebrow" data-param="doc_eyebrow"></div>
+      <div class="rbh-title" data-param="doc_titulo"></div>
+      <div class="rbh-sub" data-param="doc_subtitulo"></div>
+    </div>
+  </div>
+  <div class="rb-wrap">
+    <div class="rb-eyebrow">ETAPA 02</div>
+    <h1 class="rb-title">Recebimento</h1>
+    <p class="rb-sub" style="margin-bottom:24px">Como estamos recebendo hoje — fluxo atual.</p>
+
+    <div class="rb-melhoria">
+      <div class="rb-melhoria-ic">✦</div>
+      <div>
+        <div class="rb-melhoria-tag">Melhoria em desenvolvimento</div>
+        <h3 data-param="receb_melhoria_titulo">Agendamento de entregas assistido por Inteligência Artificial</h3>
+        <p data-param="receb_melhoria_texto"></p>
+      </div>
+    </div>
+
+    <div class="rb-acc">
+      <button class="rb-acc-head" onclick="rbAcc(this)"><span>Como agendar — Controle de Agendamento de Cargas</span><span class="rb-acc-ctrl"><span class="rb-acc-cmd">Expandir</span><svg class="rb-acc-cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span></button>
+      <div class="rb-acc-body"><div class="rb-acc-inner">
+        <div class="rb-tl" id="rb-agendamento"></div>
+        <h2 class="rb-h2"><span class="rb-ic">⏱</span> Critérios de prazo para agendamento</h2>
+        <table class="rb-table"><thead><tr><th>Quantidade de volumes</th><th>Prazo para recebimento</th></tr></thead><tbody id="rb-prazos"></tbody></table>
+      </div></div>
+    </div>
+
+    <div class="rb-acc">
+      <button class="rb-acc-head" onclick="rbAcc(this)"><span>Fluxo de recebimento</span><span class="rb-acc-ctrl"><span class="rb-acc-cmd">Expandir</span><svg class="rb-acc-cv" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M6 9l6 6 6-6"/></svg></span></button>
+      <div class="rb-acc-body"><div class="rb-acc-inner"><div class="rb-tl" id="rb-fluxo"></div></div></div>
+    </div>
+
+    <div class="rb-galeria">
+      <div class="rg-header">
+        <div>
+          <span class="rg-eyebrow">EVIDÊNCIAS FOTOGRÁFICAS</span>
+          <h2 class="rg-title" data-param="receb_galeria_titulo"></h2>
+          <p class="rg-sub" data-param="receb_galeria_sub"></p>
+        </div>
+        <div class="rg-stats">
+          <div class="rg-stat"><span class="rg-stat-n" id="rg-n-registros">0</span><span class="rg-stat-l">Registros</span></div>
+          <div class="rg-stat"><span class="rg-stat-n" id="rg-n-familias">0</span><span class="rg-stat-l">Famílias ONU</span></div>
+          <div class="rg-stat"><span class="rg-stat-n" data-param="receb_pct_rotulados"></span><span class="rg-stat-l">Rotulados</span></div>
+        </div>
+      </div>
+      <div class="rg-filtros" id="rg-filtros"></div>
+      <div class="rg-grid" id="rg-grid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ VISTA: ETAPAS "EM BREVE" (genérica) ============ -->
+<div id="view-etapa" class="fluxo-view">
+  <div class="fluxo-capa fc-vazia" id="etapa-capa">
+    <div class="fc-lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg></div>
+    <div class="fc-num" id="etapa-num"></div>
+    <h1 class="fc-titulo" id="etapa-titulo"></h1>
+    <span class="fc-status" id="etapa-status"></span>
+  </div>
+</div>
+
+<!-- ============ VISTA: SEM ABAS LIBERADAS ============ -->
+<div id="view-sem-abas" class="fluxo-view">
+  <div class="fluxo-capa fc-vazia" style="--fc-c:#525252">
+    <div class="fc-lock"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg></div>
+    <h1 class="fc-titulo" style="font-size:32px">Nenhuma aba liberada</h1>
+    <p style="color:var(--cinza-medio);font-size:14px">Seu perfil ainda não tem abas de consulta. Solicite a liberação à responsável:<br>
+      <strong>Layanne Santos</strong> · Compliance · <a href="mailto:layanne.santos@ferreiracosta.com.br?subject=Acesso%20ao%20Compliance%20Inalantes" style="color:#BD2335">layanne.santos@ferreiracosta.com.br</a></p>
+  </div>
+</div>
+
+<!-- ============ VISTA: ADMINISTRAÇÃO DE USUÁRIOS E ACESSOS ============ -->
+<div id="view-admin" class="fluxo-view">
+  <div class="rbh">
+    <div class="rbh-topo"><span data-param="doc_confidencialidade"></span></div>
+    <div class="rbh-corpo">
+      <div class="rbh-eyebrow">Administração</div>
+      <div class="rbh-title">Usuários e acessos</div>
+      <div class="rbh-sub">Cadastre usuários no Supabase e defina quais abas cada perfil pode visualizar. Administradores têm acesso total.</div>
+    </div>
+  </div>
+  <div class="adm-wrap">
+    <div id="adm-msg" class="contagem"></div>
+    <div id="adm-aviso" class="adm-aviso" hidden></div>
+
+    <div class="adm-grid">
+      <!-- NOVO USUÁRIO -->
+      <form class="card" id="adm-form-usuario" autocomplete="off">
+        <h3>👤 Cadastrar novo usuário</h3>
+        <label class="adm-lb">Nome completo</label>
+        <input class="adm-in" id="adm-nu-nome" required>
+        <label class="adm-lb">E-mail (login)</label>
+        <input class="adm-in" id="adm-nu-email" type="email" required autocomplete="off">
+        <label class="adm-lb">Senha provisória (mín. 8 caracteres)</label>
+        <input class="adm-in" id="adm-nu-senha" type="password" minlength="8" required autocomplete="new-password">
+        <label class="adm-lb">Perfil de acesso</label>
+        <select class="adm-in" id="adm-nu-perfil"></select>
+        <button class="btn-pdf" type="submit" style="margin-top:14px">Cadastrar no Supabase</button>
+        <p style="font-size:11px;color:var(--cinza-medio);margin-top:8px;line-height:1.5">O usuário entra com este e-mail e a senha provisória. O e-mail já fica confirmado.</p>
+      </form>
+
+      <!-- PERFIL -->
+      <form class="card" id="adm-form-perfil">
+        <h3 id="adm-pf-titulo">Novo perfil de acesso</h3>
+        <input type="hidden" id="adm-pf-id">
+        <label class="adm-lb">Nome do perfil</label>
+        <input class="adm-in" id="adm-pf-nome" required placeholder="Ex.: Comercial — somente consulta">
+        <label class="adm-lb">Descrição</label>
+        <input class="adm-in" id="adm-pf-desc" placeholder="Para quem é este perfil">
+        <label class="adm-lb">Abas que podem ser visualizadas</label>
+        <div id="adm-pf-abas" class="adm-abas"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          <button class="btn-pdf" type="submit">Salvar perfil</button>
+          <button class="btn-limpar" type="button" onclick="admNovoPerfil()">Limpar / novo</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card" style="margin-top:20px">
+      <h3>👥 Usuários cadastrados</h3>
+      <div class="tabela-wrapper">
+        <table>
+          <thead><tr><th>Usuário</th><th>Perfil de acesso</th><th>Situação</th><th>Ações</th></tr></thead>
+          <tbody id="adm-usuarios"></tbody>
+        </table>
+      </div>
+      <div id="adm-senha-box" class="adm-senha" hidden>
+        <strong>Nova senha para <span id="adm-senha-alvo"></span></strong>
+        <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+          <input class="adm-in" id="adm-senha-nova" type="password" minlength="8" placeholder="mín. 8 caracteres" autocomplete="new-password" style="max-width:260px;margin:0">
+          <button class="adm-btn" id="adm-senha-ok" type="button">Salvar senha</button>
+          <button class="adm-btn" type="button" onclick="document.getElementById('adm-senha-box').hidden=true">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px">
+      <h3>🔐 Perfis de acesso</h3>
+      <div id="adm-perfis" class="adm-perfis"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ CABEÇALHO DO DOCUMENTO ============ -->
+<div class="header">
+  <div class="header-topo">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span data-param="doc_confidencialidade"></span>
+      <button class="topo-btn" onclick="window.print()">SALVAR PDF</button>
+      <button class="topo-btn" onclick="abrirPlanoAcao()" style="background:#7D8F64">PLANO DE AÇÃO</button>
+    </div>
+    <span data-param="doc_normas_topo"></span>
+  </div>
+  <div class="header-corpo">
+    <div>
+      <h1><span data-param="doc_eyebrow"></span><span data-param="doc_titulo" style="all:unset"></span></h1>
+      <p style="color:var(--cinza-medio);font-size:13px;margin-top:10px" data-param="doc_subtitulo"></p>
+    </div>
+    <div class="header-stats" id="header-stats"></div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab ativo" onclick="mudarAba('contexto',this)">Contexto &amp; Objetivo</div>
+  <div class="tab" onclick="mudarAba('base-legal',this)">Base Legal</div>
+  <div class="tab" onclick="mudarAba('tabela-codigos',this)">Tabela de Códigos ONU</div>
+  <div class="tab" onclick="mudarAba('visao-geral',this)">Visão Geral</div>
+  <div class="tab" onclick="mudarAba('estoque',this)">Estoque Inalantes</div>
+  <div class="tab" onclick="mudarAba('nao-inalantes',this)">Revisão Cadastral</div>
+  <div class="tab" onclick="mudarAba('antes-depois',this)">Antes × Depois</div>
+  <div class="tab" onclick="mudarAba('concorrencia',this)">Concorrência — Grupo Ferreira Costa × Leroy Merlin</div>
+  <div class="tab" onclick="mudarAba('plano-acao',this)">Plano de Ação</div>
+  <div class="tab" onclick="mudarAba('armazenamento',this)">Armazenamento por Família</div>
+  <div class="tab" onclick="mudarAba('evidencias',this)">Evidências por Filial</div>
+</div>
+
+<!-- ======================== CONTEXTO & OBJETIVO ======================== -->
+<div id="contexto" class="secao ativa">
+  <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:14px;padding:40px 44px;margin-bottom:28px;position:relative;overflow:hidden">
+    <div style="position:absolute;top:-40px;right:-40px;width:260px;height:260px;border-radius:50%;background:rgba(189,35,53,.08)"></div>
+    <div style="position:relative">
+      <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(189,35,53,.2);border:1.5px solid #BD2335;border-radius:20px;padding:5px 14px;margin-bottom:16px;animation:glow-badge 1.5s ease-in-out infinite">
+        <div style="width:8px;height:8px;background:#BD2335;border-radius:50%;animation:blink-dot 1.5s ease-in-out infinite"></div>
+        <span style="font-size:11px;font-weight:700;color:#BD2335;text-transform:uppercase;letter-spacing:.8px">Compliance Interno — Uso Restrito</span>
+      </div>
+      <h2 style="font-size:30px;font-weight:800;line-height:1.2;margin-bottom:12px">Monitoramento de Inalantes<br><span style="color:var(--cinza-medio);font-size:18px;font-weight:400">Base de Cadastro</span></h2>
+      <p style="font-size:14px;color:var(--cinza-medio);line-height:1.8;max-width:680px">Este documento consolida o diagnóstico de conformidade legal da base de produtos perigosos do <strong style="color:var(--cinza-escuro)" data-param="empresa"></strong>. Dos <strong style="color:var(--cinza-escuro)"><span data-kpi="skus"></span> SKUs</strong> de Tintas e Químicos cadastrados como inalantes e produtos perigosos, <strong style="color:var(--cinza-escuro)"><span data-kpi="naoConformes"></span> necessitam de adequação na descrição</strong> para atender à Resolução ANTT nº 5.998/22. Desses, <strong style="color:var(--cinza-escuro)"><span data-kpi="ativos"></span> estão ativos</strong> e <strong style="color:var(--cinza-escuro)"><span data-kpi="inativos"></span> inativos</strong>. Adicionalmente, existem itens cadastrados como inalantes que aparentemente <strong style="color:var(--cinza-escuro)">não se enquadram nessa classificação</strong> e precisam ser reavaliados pela <strong style="color:var(--cinza-escuro)">Central de Cadastro</strong> para direcionamento ao grupo de compras correto. O foco deste diagnóstico está na adequação das descrições, no controle de armazenamento e na conformidade com a legislação vigente de transporte, armazenagem e venda de inalantes e substâncias perigosas.</p>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card card-vermelho">
+      <h3>⚖️ Por que este monitoramento existe?</h3>
+      <p style="font-size:13px;color:var(--cinza-medio);line-height:1.8">A <strong>Resolução ANTT nº 5.998/2022</strong> tornou obrigatória a inclusão do Número ONU, Classe de Risco e Grupo de Embalagem na descrição dos produtos perigosos em toda nota fiscal emitida. Sem essa informação, cada NF emitida é considerada tecnicamente irregular — expondo a empresa a multas, embargos e responsabilidade penal em caso de acidente durante o transporte.</p>
+      <p style="font-size:13px;color:var(--cinza-medio);line-height:1.8;margin-top:10px">Paralelamente, a <strong>Portaria SVS/MS nº 344/1998</strong> e a <strong>RDC ANVISA 29/2011</strong> controlam a venda de substâncias com potencial de dependência — entre elas thinners, solventes e colas — exigindo controle ativo no ponto de venda e restrição a menores de 18 anos.</p>
+    </div>
+    <div class="card card-azul">
+      <h3>🏢 Contexto — <span data-param="empresa"></span></h3>
+      <p style="font-size:13px;color:var(--cinza-medio);line-height:1.8">O Grupo Ferreira Costa é uma rede varejista de materiais de construção com presença em múltiplos estados do Nordeste. Por comercializar um volume expressivo de produtos perigosos — aerossóis, solventes, ácidos e adesivos — a conformidade legal nessa categoria é crítica para a continuidade operacional.</p>
+      <p style="font-size:13px;color:var(--cinza-medio);line-height:1.8;margin-top:10px">O diagnóstico identificou que <strong><span data-kpi="pctNaoConf"></span> das descrições dos <span data-kpi="skus"></span> produtos perigosos</strong> estavam incorretas no ERP, sem os campos obrigatórios de classificação. Este projeto tem como objetivo corrigir essa lacuna e estabelecer um protocolo permanente de conformidade.</p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:20px">
+    <h3>🎯 As Três Frentes deste Projeto</h3>
+    <div class="grid-auto" id="ctx-frentes" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px"></div>
+  </div>
+
+  <div style="margin-top:32px">
+    <div class="sec-titulo"><h2>Fluxo</h2></div>
+    <div style="position:relative;overflow-x:auto">
+      <div id="ctx-fluxo-linha" style="position:absolute;top:22px;left:6.25%;right:6.25%;height:2px;z-index:0;min-width:860px"></div>
+      <div class="fx-grid" id="ctx-fluxo"></div>
+    </div>
+  </div>
+
+  <div class="card" style="margin:24px 0 20px">
+    <h3>⚠️ O que acontece sem a adequação?</h3>
+    <div class="grid-auto" id="ctx-riscos"></div>
+  </div>
+
+  <div style="background:var(--cinza-claro);border-radius:10px;padding:20px 24px;border:1px solid var(--cinza-borda)">
+    <h3 style="font-size:14px;font-weight:700;margin-bottom:14px">🗂️ Como navegar neste documento</h3>
+    <div class="grid-auto" id="ctx-navegacao" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px"></div>
+  </div>
+</div>
+
+<!-- ======================== VISÃO GERAL ======================== -->
+<div id="visao-geral" class="secao">
+  <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:14px;overflow:hidden;margin-bottom:24px">
+    <div style="background:#BD2335;padding:10px 28px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;color:white">⚠ ALERTA MÁXIMO — RISCO ATIVO IDENTIFICADO</div>
+    <div style="padding:28px 32px;display:flex;justify-content:space-between;gap:32px;flex-wrap:wrap;align-items:flex-start">
+      <div style="flex:1;min-width:260px">
+        <div style="font-size:11px;font-weight:700;color:#BD2335;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Não Conformidade · <span data-kpi="naoConformes"></span> de <span data-kpi="skus"></span> produtos · <span data-kpi="pctNaoConf"></span> irregular</div>
+        <h2 style="font-size:24px;font-weight:800;line-height:1.25;margin-bottom:14px">Cada Nota Fiscal emitida com produto perigoso<br>é uma <span style="color:#BD2335">infração federal documentada.</span></h2>
+        <p style="font-size:13px;color:var(--cinza-medio);line-height:1.7;max-width:580px"><strong data-kpi="naoConformes"></strong> dos <span data-kpi="skus"></span> produtos perigosos não possuem Número ONU, Classe de Risco ou Grupo de Embalagem na descrição do ERP — exigência obrigatória da <strong>Resolução ANTT nº 5.998/22</strong>. A situação está ativa hoje e afeta todas as unidades do Grupo Ferreira Costa.</p>
+      </div>
+      <div style="background:rgba(189,35,53,.2);border:1px solid rgba(189,35,53,.5);border-radius:10px;padding:20px 24px;text-align:center;min-width:140px">
+        <div style="font-size:48px;font-weight:900;color:#BD2335;line-height:1" data-kpi="naoConformes"></div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--cinza-medio);margin-top:4px">infrações<br>em aberto</div>
+      </div>
+    </div>
+    <div id="vg-alerta-pf"></div>
+  </div>
+
+  <div class="grid-4" id="vg-metricas"></div>
+
+  <div class="grid-2" style="grid-template-columns:1fr 1.5fr">
+    <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:14px;padding:24px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--cinza-medio)">Classe de Risco</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:20px"><span data-kpi="skus"></span> SKUs avaliados</div>
+      <div id="vg-classes-barra" style="display:flex;border-radius:6px;overflow:hidden;height:14px;margin-bottom:20px;gap:2px"></div>
+      <div id="vg-classes" style="display:flex;flex-direction:column;gap:10px"></div>
+    </div>
+    <div style="background:#fff;border-radius:14px;border:1px solid var(--cinza-borda);padding:24px">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--cinza-medio)">Código ONU</div>
+      <div style="font-size:15px;font-weight:700;margin-bottom:20px">Ranking por volume de SKUs</div>
+      <div id="vg-onu" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+  </div>
+
+  <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:14px;padding:28px 32px;border-left:5px solid #BD2335">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <div style="width:8px;height:8px;border-radius:50%;background:#BD2335;animation:pulse 1.5s infinite"></div>
+      <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#BD2335">Exposição de Risco — Situação Atual</span>
+    </div>
+    <h3 style="font-size:22px;font-weight:800;margin-bottom:4px"><span data-kpi="pctNaoConf"></span> dos produtos perigosos com cadastro irregular</h3>
+    <p style="font-size:13px;color:var(--cinza-medio);margin-bottom:24px">Cada NF emitida nessa condição é uma infração documentada. Os riscos vão além da multa.</p>
+    <div class="grid-auto" id="vg-riscos" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))"></div>
+  </div>
+</div>
+
+<!-- ======================== BASE LEGAL ======================== -->
+<div id="base-legal" class="secao">
+  <div class="sec-titulo">
+    <h2>Base Legal e Fundamentação Jurídica</h2>
+    <p>O não cumprimento dessas normas expõe a empresa a sanções cíveis, administrativas e penais. A adequação das descrições é obrigação legal — não discricionária.</p>
+  </div>
+  <div id="bl-normas"></div>
+  <div style="margin-top:24px">
+    <h3 style="font-size:18px;font-weight:700;margin-bottom:16px">Estrutura Obrigatória da Descrição (ANTT 5.998/22 — Item 5.4.1.1.1)</h3>
+    <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;padding:24px">
+      <div style="font-size:12px;color:var(--cinza-medio);margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px">Formato exato exigido por lei — separado por vírgulas</div>
+      <div style="font-size:15px;line-height:2;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+        <span style="background:#BD2335;color:white;padding:4px 10px;border-radius:4px">NOME COMERCIAL</span> –
+        <span style="background:#C9A839;padding:4px 10px;border-radius:4px">UN XXXX</span> ,
+        <span style="background:#C9A839;padding:4px 10px;border-radius:4px">NOME EMBARQUE</span> ,
+        <span style="background:#7D8F64;padding:4px 10px;border-radius:4px">CLASSE</span> ,
+        <span style="background:#525252;color:#fff;padding:4px 10px;border-radius:4px">GE (quando aplicável)</span>
+      </div>
+      <div style="margin-top:16px;padding:12px 16px;background:rgba(0,0,0,.03);border-radius:6px;font-size:13px;color:#7D8F64">Exemplo: THINNER ECOEFICIENTE 5,0L – UN 1263 MATERIAL RELACIONADO COM TINTAS, 3, GE II</div>
+      <div class="grid-auto" style="margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;font-size:12px;color:var(--cinza-medio);line-height:1.5">
+        <div style="background:rgba(189,35,53,.15);border-radius:8px;padding:12px 14px"><strong>NOME COMERCIAL</strong><br>Nome do produto exatamente como cadastrado no ERP — incluindo marca, volume e apresentação.</div>
+        <div style="background:rgba(201,168,57,.15);border-radius:8px;padding:12px 14px"><strong>UN XXXX</strong><br>Número ONU de 4 dígitos que identifica a substância perigosa conforme tabela da ONU (ex.: UN 1950 = Aerossóis).</div>
+        <div style="background:rgba(201,168,57,.15);border-radius:8px;padding:12px 14px"><strong>NOME EMBARQUE</strong><br>Denominação técnica padronizada pela ONU para o grupo da substância — obrigatória na NF e no manifesto de transporte.</div>
+        <div style="background:rgba(125,143,100,.15);border-radius:8px;padding:12px 14px"><strong>CLASSE</strong><br>Classe de risco conforme ANTT (ex.: Cl. 2.1 Gases Inflamáveis, Cl. 3 Líquidos Inflamáveis, Cl. 8 Corrosivos).</div>
+        <div style="background:rgba(82,82,82,.15);border-radius:8px;padding:12px 14px"><strong>GE</strong><br>Grupo de Embalagem (I, II ou III) — indica o grau de periculosidade. Omitido apenas quando a classe não exige (ex.: aerossóis UN 1950).</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================== TABELA CÓDIGOS ONU ======================== -->
+<div id="tabela-codigos" class="secao">
+  <div class="sec-titulo">
+    <h2>Tabela de Referência — <span id="tc-qtd"></span> Famílias ONU</h2>
+    <p>Os códigos ONU que cobrem os produtos perigosos desta base. Use esta tabela como referência rápida para classificação e para treinamento das equipes de cadastro e compras.</p>
+  </div>
+  <div class="tabela-wrapper">
+    <table>
+      <thead><tr><th>Código ONU</th><th>Nome Apropriado para Embarque</th><th>Família / Linha</th><th>Classe</th><th>Significado</th><th>GE</th><th>Grau de Risco</th><th>SKUs</th><th>Exemplos na Base</th></tr></thead>
+      <tbody id="tc-tbody"></tbody>
+    </table>
+  </div>
+  <div style="margin-top:24px" class="card card-laranja">
+    <h3>📋 Regras Especiais de Transporte por Família</h3>
+    <div class="grid-2" id="tc-regras" style="margin:0"></div>
+  </div>
+  <div style="margin-top:20px;background:#fff;border:1px solid var(--cinza-borda);border-radius:12px;overflow:hidden">
+    <div style="padding:18px 24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border-bottom:1px solid var(--cinza-borda)">
+      <div>
+        <div style="font-size:17px;font-weight:700">📄 FDS — Ficha de Dados de Segurança</div>
+        <div style="color:var(--cinza-medio);font-size:12px">Antes chamada FISPQ · Atualização: ABNT NBR 14725 (julho 2023) · Fornecedor é obrigado a disponibilizar</div>
+      </div>
+      <div style="background:rgba(125,143,100,.25);color:#7D8F64;font-size:11px;font-weight:700;padding:6px 14px;border-radius:20px">Obrigatório para todos os UNs desta base</div>
+    </div>
+    <div class="grid-auto" id="tc-fds-info" style="gap:0;border-bottom:1px solid var(--cinza-borda)"></div>
+    <div class="grid-2" id="tc-fds-listas" style="margin:0;gap:0"></div>
+  </div>
+</div>
+
+<!-- ======================== ANTES × DEPOIS ======================== -->
+<div id="antes-depois" class="secao">
+  <div class="sec-titulo">
+    <h2>Comparativo: Antes × Depois</h2>
+    <p>Exemplos reais da base de dados — formato atual (irregular) versus formato exigido pela lei.</p>
+  </div>
+  <div style="background:rgba(201,168,57,.15);border:1px solid #C9A839;border-left:4px solid #C9A839;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#8a7020;line-height:1.7">
+    ⚠️ <strong>Atenção:</strong> As descrições exibidas abaixo são <strong>exemplos ilustrativos</strong> do formato correto exigido pela ANTT 5.998/22. A descrição final será ajustada em conjunto com a <strong>Central de Cadastro</strong>, respeitando o limite de caracteres do sistema — <strong><span data-param="limite_desc_revenda"></span> caracteres para revendas</strong> e <strong><span data-param="limite_desc_consumo"></span> caracteres para consumo</strong>.
+  </div>
+  <div id="comparativos"></div>
+</div>
+
+<!-- ======================== ESTOQUE ======================== -->
+<div id="estoque" class="secao">
+  <div class="sec-titulo">
+    <h2>📦 Estoque de Inalantes — Visão por Filial</h2>
+    <p>Painel completo do estoque de produtos inalantes classificados com ONU. Filtre por filial, marca, código ONU e status ativo para análise detalhada.</p>
+    <p style="margin-top:8px;font-size:12px;color:var(--cinza-medio)">
+      <span style="background:var(--laranja-claro);color:var(--laranja-texto);font-weight:700;padding:3px 8px;border-radius:4px;font-size:11px">⚠️ ATENÇÃO</span>
+      Posição de estoque extraída em <strong data-param="estoque_data_posicao"></strong>. Quantidade e valor podem ter sofrido alterações conforme vendas e recebimentos posteriores.
+    </p>
+  </div>
+  <div class="kpis" id="estoque-kpis"></div>
+  <div class="filtros">
+    <input type="text" id="est-busca" placeholder="🔍 Buscar por código, descrição ou marca..." oninput="filtrarEstoque()" style="min-width:260px;flex:2">
+    <select id="est-filial" onchange="filtrarEstoque()"><option value="">Todas as Filiais</option></select>
+    <select id="est-marca" onchange="filtrarEstoque()"><option value="">Todas as Marcas</option></select>
+    <select id="est-onu" onchange="filtrarEstoque()"><option value="">Todos os ONU</option></select>
+    <select id="est-risco" onchange="filtrarEstoque()">
+      <option value="">Todos os Riscos</option><option value="ALTO">🔴 Alto</option><option value="MÉDIO">🟠 Médio</option><option value="ISENTO">🟢 Isento</option>
+    </select>
+    <select id="est-ativo" onchange="filtrarEstoque()"><option value="">Ativo / Inativo</option><option value="S">✅ Ativo</option><option value="N">❌ Inativo</option></select>
+    <button class="btn-limpar" onclick="limparFiltros('est')">✕ Limpar</button>
+  </div>
+  <div class="contagem" id="est-contagem"></div>
+  <div class="tabela-wrapper">
+    <table>
+      <thead><tr>
+        <th>Filial</th><th>Linha</th><th>Marca</th><th>Cód. Produto</th><th>Descrição</th><th>Cód. ONU</th>
+        <th style="text-align:center">Classe</th><th style="text-align:center">GE</th><th style="text-align:center">Risco</th>
+        <th style="text-align:right">Qtd</th><th style="text-align:right">Vl. Unit.</th><th style="text-align:right">Vl. Total</th>
+        <th>Descrição Correta</th><th style="text-align:center">Ativo</th>
+      </tr></thead>
+      <tbody id="tbody-estoque"></tbody>
+    </table>
+  </div>
+  <div class="totais" id="est-totais"></div>
+  <div class="paginacao" id="est-paginacao"></div>
+</div>
+
+<!-- ======================== ARMAZENAMENTO ======================== -->
+<div id="armazenamento" class="secao">
+  <div class="sec-titulo">
+    <h2>Armazenamento — Diagnóstico Real + Requisitos Legais</h2>
+    <p>Esta aba reúne requisitos legais por família ONU. Base normativa: ABNT NBR 17505, NR-20, NBR 12693, NR-26, Lei 9.294/96, RDC ANVISA 29/2011.</p>
+  </div>
+
+  <div style="margin-bottom:20px">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:5px;height:28px;background:var(--vermelho);border-radius:3px"></div>
+      <h3 style="font-size:20px;font-weight:800">Diagnóstico por Local</h3>
+    </div>
+    <p style="font-size:13px;color:var(--cinza-medio);margin:5px 0 20px 15px"><span data-param="vistoria_fotos"></span> fotografias analisadas · <span id="ar-qtd-locais"></span> pontos de atenção identificados</p>
+    <div class="grid-auto" id="ar-locais-1" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px"></div>
+  </div>
+
+  <div style="margin:32px 0 36px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+      <div style="width:5px;height:32px;background:#525252;border-radius:3px"></div>
+      <div>
+        <h3 style="font-size:20px;font-weight:800">Como Deve Ser o Isolamento Correto para Thinner</h3>
+        <p style="font-size:12px;color:var(--cinza-medio);margin-top:3px">UN 1263 / Classe 3 — Líquido Inflamável · Base: ABNT NBR 17505-4 · NR-20 · NBR 12693 · NR-26</p>
+      </div>
+    </div>
+    <div style="background:rgba(201,168,57,.15);border-left:4px solid #C9A839;border-radius:8px;padding:12px 16px;margin:16px 0;font-size:12px;color:#8a7020;line-height:1.6">
+      <strong>Regra básica:</strong> thinner e inflamáveis precisam de um <strong>espaço exclusivo, isolado, ventilado e longe de faísca</strong>. Se uma dessas condições falhar, o risco de explosão e incêndio é real e imediato.
+    </div>
+    <div id="ar-isolamento" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;align-items:start"></div>
+  </div>
+
+  <div class="grid-auto" id="ar-locais-2" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:28px"></div>
+
+  <div class="card" style="margin-bottom:28px">
+    <h3>📊 Painel de Conformidade — <span id="ar-qtd-crit"></span> Critérios Avaliados</h3>
+    <div style="overflow-x:auto">
+      <table style="font-size:13px">
+        <thead><tr><th style="min-width:200px">Critério</th><th>Situação encontrada</th><th>Exigência legal</th><th>Base normativa</th><th>Status</th></tr></thead>
+        <tbody id="ar-criterios"></tbody>
+      </table>
+    </div>
+    <div id="ar-placar" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:20px"></div>
+  </div>
+
+  <div class="card card-verde" style="margin-bottom:28px">
+    <h3>✅ Como Deveria Ser — Exposição Correta no Varejo</h3>
+    <div class="grid-auto" id="ar-como-deveria" style="gap:14px"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:28px">
+    <h3>🏪 Como Deve Ser a Exposição — Por Grupo de Produto</h3>
+    <p style="font-size:13px;color:var(--cinza-medio);margin-bottom:20px">Cada família de produto perigoso tem requisitos específicos de exposição no ponto de venda, conforme NBR 17505, NR-20, IT-CBMPE e RDC 29/2011.</p>
+    <div id="ar-exposicao"></div>
+    <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;padding:20px;margin-top:4px">
+      <div style="font-size:11px;font-weight:700;color:var(--cinza-medio);text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px">📋 Resumo — Comparativo de Exposição por Grupo</div>
+      <div style="overflow-x:auto"><table style="font-size:12px">
+        <thead><tr><th>Grupo</th><th>ONU</th><th>Qtd. Máx. Salão</th><th>Tipo de Exposição</th><th>Verif. Idade</th><th>Extintor Dedicado</th></tr></thead>
+        <tbody id="ar-exposicao-resumo"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:32px">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+      <div style="background:var(--vermelho);border-radius:8px;padding:8px 14px;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:white">📸 Evidências Fotográficas — Vistoria</div>
+      <div style="font-size:13px;color:var(--cinza-medio)">Clique em qualquer imagem para ampliar</div>
+    </div>
+    <div id="ar-ncs"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:28px">
+    <h3>🔍 Produtos Identificados na Vistoria — Classificação e Restrições</h3>
+    <div class="tabela-wrapper"><table>
+      <thead><tr><th>Produto</th><th>Marca</th><th>Volume</th><th>ONU / Classe</th><th>Restrição de Venda</th><th>Local encontrado</th></tr></thead>
+      <tbody id="ar-vistoria"></tbody>
+    </table></div>
+  </div>
+
+  <div class="grid-auto" id="ar-consequencias" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:28px"></div>
+
+  <div style="background:#F6F2EC;border-radius:8px;padding:14px 18px;border:1px solid var(--cinza-borda);font-size:12px;color:var(--cinza-medio);line-height:1.7">
+    ⚠️ <strong>Aviso legal:</strong> Esta análise é baseada em fotografias e tem caráter técnico-informativo. Não substitui laudo de engenheiro de segurança do trabalho legalmente habilitado (CREA/CFT) nem vistoria oficial do Corpo de Bombeiros. As quantidades máximas indicadas podem variar conforme as Instruções Técnicas específicas do CBMPE vigentes.
+  </div>
+
+  <div style="margin-top:32px;border-top:2px solid var(--cinza-borda);padding-top:24px">
+    <h3 style="font-size:18px;font-weight:700;margin-bottom:8px">📚 Requisitos Legais por Família ONU — Referência Técnica</h3>
+    <p style="font-size:13px;color:var(--cinza-medio);margin-bottom:24px">Requisitos normativos para cada família identificada na base, independentemente da situação atual do estabelecimento.</p>
+  </div>
+  <div class="alerta alerta-critico" style="margin-bottom:28px">
+    <div class="alerta-icone">⚠️</div>
+    <div>
+      <h4>Armazenamento inadequado é crime ambiental e gera responsabilidade penal</h4>
+      <p>A Lei 9.605/98 (Crimes Ambientais) e a NR-20 (Portaria MTE 308/2012) estabelecem que o armazenamento irregular de produtos inflamáveis, corrosivos e tóxicos sujeita os responsáveis a multa, interdição do estabelecimento e prisão de até 5 anos. Cada família abaixo possui requisitos específicos.</p>
+    </div>
+  </div>
+  <div id="ar-requisitos"></div>
+
+  <div class="card" style="margin-top:8px">
+    <h3>⚠️ Tabela de Incompatibilidades — Nunca Armazenar Junto</h3>
+    <div class="tabela-wrapper"><table>
+      <thead><tr><th>Produto</th><th>Incompatível com</th><th>Risco da combinação</th></tr></thead>
+      <tbody id="ar-incompat"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<!-- ======================== CONCORRÊNCIA ======================== -->
+<div id="concorrencia" class="secao">
+  <div class="sec-titulo">
+    <h2>Análise Comparativa — Grupo Ferreira Costa × Leroy Merlin</h2>
+    <p>Comparativo das descrições de inalantes/solventes da nossa base versus a concorrente, com análise de conformidade legal (ANTT 5.998/22) e boas práticas de cadastro.</p>
+  </div>
+  <div class="grid-2" id="cc-produtos" style="margin-bottom:28px"></div>
+  <div style="background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;padding:20px 28px;margin-bottom:28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
+    <div>
+      <div style="font-size:11px;color:var(--cinza-medio);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Placar de Conformidade Legal</div>
+      <div style="font-size:13px;color:var(--cinza-medio)">Critérios avaliados: código ONU, classe de risco, GE, nome de embarque, descrição técnica</div>
+    </div>
+    <div style="display:flex;gap:16px;align-items:center" id="cc-placar"></div>
+  </div>
+  <div class="card" style="margin-bottom:24px;padding:0">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--cinza-borda);background:var(--cinza-claro)"><h3 style="margin:0">Análise Critério a Critério</h3></div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th style="width:28%">Critério de Análise</th><th style="width:30%">Leroy Merlin — Concorrente</th><th style="width:30%">Grupo Ferreira Costa — Nós</th><th>Vantagem</th></tr></thead>
+      <tbody id="cc-criterios"></tbody>
+    </table></div>
+  </div>
+  <div class="grid-2" id="cc-resumos"></div>
+  <div style="margin-top:24px;background:#fff;border:1px solid var(--cinza-borda);border-radius:10px;padding:24px 28px">
+    <div style="font-size:11px;color:var(--cinza-medio);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Conclusão para a diretoria</div>
+    <p style="font-size:14px;line-height:1.8;color:var(--cinza-medio)">A análise mostra que o <strong style="color:#BD2335">Grupo Ferreira Costa — nossa empresa</strong> está em desvantagem competitiva no cadastro de inalantes: nenhum produto possui código ONU, classe de risco ou GE na descrição. A <strong style="color:#C9A839">Leroy Merlin, nossa concorrente direta</strong>, já inclui o ONU 1223, Classe 3 e GE II no próprio título dos produtos — tornando cada NF-e dela mais segura juridicamente do que a nossa. <strong style="color:var(--cinza-escuro)">A adequação das <span data-kpi="skus"></span> descrições não é apenas uma exigência legal: é uma vantagem competitiva que nos coloca acima da Leroy Merlin e em plena conformidade com a ANTT 5.998/22</strong>, protegendo a empresa de multas, apreensões e responsabilidade criminal dos gestores.</p>
+  </div>
+</div>
+
+<!-- ======================== EVIDÊNCIAS POR FILIAL ======================== -->
+<div id="evidencias" class="secao">
+  <div class="sec-titulo">
+    <h2>📸 Evidências Fotográficas por Filial</h2>
+    <p>Vistoria de campo realizada em <span data-param="evidencias_periodo"></span> — armazenamento de produtos inalantes e perigosos por unidade.</p>
+  </div>
+  <div class="ev-tabs" id="evTabs"></div>
+  <div id="evPanels"></div>
+</div>
+
+<!-- ======================== REVISÃO CADASTRAL ======================== -->
+<div id="nao-inalantes" class="secao">
+  <div class="sec-titulo">
+    <h2>🔍 Revisão Cadastral — Itens Não Inalantes</h2>
+    <p>Itens atualmente cadastrados como inalantes mas que aparentemente não se enquadram nessa classificação. Necessitam de revisão cadastral.</p>
+  </div>
+  <div class="kpis" id="ni-kpis"></div>
+  <div class="filtros">
+    <input type="text" id="ni-busca" placeholder="🔍 Buscar por código, descrição ou marca..." oninput="filtrarNI()" style="min-width:260px;flex:2">
+    <select id="ni-filial" onchange="filtrarNI()"><option value="">Todas as Filiais</option></select>
+    <select id="ni-linha" onchange="filtrarNI()"><option value="">Todas as Linhas</option></select>
+    <select id="ni-marca" onchange="filtrarNI()"><option value="">Todas as Marcas</option></select>
+    <select id="ni-revisao" onchange="filtrarNI()"><option value="">Revisão: Todos</option><option value="pendente">⏳ Pendente</option><option value="revisado">✅ Revisado</option></select>
+    <button class="btn-limpar" onclick="limparFiltros('ni')">✕ Limpar</button>
+  </div>
+  <div class="contagem" id="ni-contagem"></div>
+  <div class="tabela-wrapper">
+    <table>
+      <thead><tr><th>Filial</th><th>Linha</th><th>Marca</th><th>Cód. Produto</th><th>Descrição</th><th style="text-align:right">Qtd Estoque</th><th style="text-align:right">Vl. Unitário</th><th style="text-align:right">Vl. Total Estoque</th><th style="text-align:center">Revisão Cadastral</th></tr></thead>
+      <tbody id="tbody-ni"></tbody>
+    </table>
+  </div>
+  <div class="totais" id="ni-totais"></div>
+  <div class="paginacao" id="ni-paginacao"></div>
+</div>
+
+<!-- ======================== PLANO DE AÇÃO (roteiro) ======================== -->
+<div id="plano-acao" class="secao">
+  <div class="sec-titulo">
+    <h2>Plano de Ação — Adequação das Descrições</h2>
+    <p>Roteiro de implementação para adequar as <span data-kpi="skus"></span> descrições ao padrão legal. <span data-param="plano_prazo"></span></p>
+  </div>
+  <div style="position:relative;padding-left:32px">
+    <div style="position:absolute;left:11px;top:0;bottom:0;width:2px;background:var(--cinza-borda)"></div>
+    <div id="pl-roteiro"></div>
+  </div>
+  <div style="margin-top:32px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px">
+    <div>
+      <div style="font-size:13px;color:var(--cinza-medio)">Exportar este relatório completo para PDF</div>
+      <div style="font-size:12px;color:var(--cinza-medio);margin-top:2px">Inclui todas as abas, tabelas, base legal e plano de ação</div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn-pdf" onclick="window.print()">Salvar como PDF</button>
+      <button class="btn-xlsx" onclick="baixarDocumento('plano_5w2h_xlsx')">Baixar Plano de Ação (.xlsx)</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ LIGHTBOX ÚNICO ============ -->
+<div class="lb" id="lb">
+  <div class="lb-toolbar">
+    <button class="lb-tbtn" onclick="lbGirar(-90)" title="Girar esquerda">⟲</button>
+    <button class="lb-tbtn" onclick="lbGirar(90)" title="Girar direita">⟳</button>
+    <div class="lb-div"></div>
+    <button class="lb-tbtn" onclick="lbZoom(-0.25)" title="Zoom −">−</button>
+    <span class="lb-zoom" id="lb-zoom">100%</span>
+    <button class="lb-tbtn" onclick="lbZoom(0.25)" title="Zoom +">+</button>
+    <button class="lb-tbtn" onclick="lbReset()" title="Resetar">0</button>
+    <div style="flex:1"></div>
+    <span style="color:rgba(255,255,255,.35);font-size:11px">← → navegar · R girar · + − zoom · ESC fechar</span>
+    <div style="flex:1"></div>
+    <button class="lb-tbtn lb-close" onclick="lbFechar()">✕</button>
+  </div>
+  <div class="lb-vp" id="lb-vp">
+    <button class="lb-nav lb-prev" onclick="lbNav(-1)">‹</button>
+    <img id="lb-img" alt="" draggable="false">
+    <button class="lb-nav lb-next" onclick="lbNav(1)">›</button>
+  </div>
+  <div class="lb-info">
+    <div id="lb-view">
+      <div class="lb-title" id="lb-title"></div>
+      <div class="lb-desc" id="lb-desc"></div>
+      <button class="lb-edit-btn" id="lb-edit-btn" onclick="lbEditar(true)" hidden>✎ Editar legenda</button>
+    </div>
+    <div class="lb-edit" id="lb-edit" hidden>
+      <input id="lb-edit-title" type="text" placeholder="Título">
+      <input id="lb-edit-desc" type="text" placeholder="Descrição">
+      <button class="lb-save" onclick="lbSalvar()">✓ Salvar</button>
+      <button class="lb-cancel" onclick="lbEditar(false)">Cancelar</button>
+    </div>
+    <div class="lb-counter" id="lb-counter"></div>
+  </div>
+</div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
