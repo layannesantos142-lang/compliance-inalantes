@@ -448,6 +448,7 @@ body.modo-fluxo .fluxo-view.ativa{display:block}
 .pa-modal-grid4{grid-template-columns:1fr 1.2fr .7fr 1fr}
 .pa-modal-box{width:min(640px,100%)}
 @media(max-width:560px){.pa-modal-grid,.pa-modal-grid4{grid-template-columns:1fr}}
+.pa-trava{display:block;font-size:11px;font-weight:700;color:#1B5E20;white-space:nowrap;margin-bottom:4px}
 .pa-sol-nova{border-left-color:#1565C0;background:#F7FAFF}
 .pa-ficha{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px 14px;margin:8px 0;font-size:12px}
 .pa-ficha div{display:flex;flex-direction:column;line-height:1.35}
