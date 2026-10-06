@@ -1226,9 +1226,9 @@
     await recarregarPlano();
   });
 
-  // "Data / Versão" do plano é atualizada pelo banco a cada alteração
+  // "Data de atualização" do plano é gravada pelo banco a cada alteração
   async function atualizarVersaoPlano() {
-    const { data } = await sb.from('parametros').select('chave,valor').eq('chave', 'plano_data_versao');
+    const { data } = await sb.from('parametros').select('chave,valor').eq('chave', 'plano_ultima_atualizacao');
     (data || []).forEach(p => { S.param[p.chave] = p.valor; });
     aplicarParametros();
   }
