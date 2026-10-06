@@ -955,7 +955,49 @@
     renderAprovacoes();
     marcarLinhasPlano();
     atualizarBadgePlano();
+    atualizarNotificacoes();
   }
+
+  // ---------------------------------------------------------------- notificações para quem solicitou (aprovada / recusada)
+  const notifJaMostradas = new Set();
+  let notifTimer = null;
+  const naoLidas = () => AP.sol.filter(s => s.solicitante === AP.uid && (s.situacao === 'aprovada' || s.situacao === 'recusada') && !s.lida_em);
+  function atualizarNotificacoes() {
+    const lista = naoLidas();
+    $('btn-notif').hidden = !lista.length;
+    $('notif-n').textContent = lista.length || '';
+    // abre a janela sozinha quando chega uma resposta nova
+    if (lista.some(s => !notifJaMostradas.has(s.id))) {
+      lista.forEach(s => notifJaMostradas.add(s.id));
+      abrirNotificacoes();
+    }
+    // quem está com o sistema aberto recebe a resposta sem precisar recarregar a página
+    if (!notifTimer && !(S.acesso && S.acesso.admin)) notifTimer = setInterval(carregarAprovacoes, 120000);
+  }
+  window.abrirNotificacoes = function () {
+    const lista = naoLidas();
+    if (!lista.length) return;
+    $('notif-lista').innerHTML = lista.map(s => {
+      const ok = s.situacao === 'aprovada';
+      const titulo = s.tipo === 'inclusao' ? `Nova ação${s.acao_numero ? ' ' + s.acao_numero : ''} · ${esc(s.acao_titulo || '')}`
+        : `Ação ${s.acao_numero} · ${esc(s.acao_titulo || '')}`;
+      return `<div class="notif-item ${ok ? 'ok' : 'no'}">
+        <div class="notif-sit">${ok ? '✅ APROVADA' : '❌ RECUSADA'}</div>
+        <div><b>${titulo}</b></div>
+        <div style="font-size:12px;color:var(--cinza-medio)">Enviada em ${fmtDataHora(s.criado_em)} · decidida por ${esc(s.decidido_por_nome || 'administradora')} em ${fmtDataHora(s.decidido_em)}</div>
+        ${s.motivo_decisao ? `<div class="notif-motivo">💬 ${esc(s.motivo_decisao)}</div>` : ''}
+        <div style="font-size:12px;margin-top:4px">${ok ? (s.tipo === 'inclusao' ? 'A ação já está no plano.' : 'A alteração já foi aplicada no plano.') : 'O plano não foi alterado.'}</div>
+      </div>`;
+    }).join('');
+    $('notif-modal').hidden = false;
+  };
+  window.fecharNotificacoes = async function (irParaPlano) {
+    $('notif-modal').hidden = true;
+    const { error } = await sb.rpc('marcar_notificacoes_lidas');
+    if (!error) AP.sol.forEach(s => { if (s.solicitante === AP.uid && s.situacao !== 'pendente') s.lida_em = s.lida_em || new Date().toISOString(); });
+    atualizarNotificacoes();
+    if (irParaPlano) { abrirPlanoAcao(); setTimeout(() => $('pa-aprov-box').scrollIntoView({ behavior: 'smooth' }), 400); }
+  };
 
   function atualizarBadgePlano() {
     const n = S.acesso && S.acesso.admin ? AP.sol.filter(x => x.situacao === 'pendente').length : 0;
@@ -1067,7 +1109,7 @@
           <span style="font-size:11px;color:#888">As alterações entram no plano após aprovação da administradora</span></div>
         <div class="pa-aprov-cont">${minhas.map(s => `<div class="pa-sol" style="border-left-color:${s.situacao === 'aprovada' ? '#2E7D32' : s.situacao === 'recusada' ? '#B71C1C' : '#C9A839'}">
             <div class="pa-sol-top"><strong>${s.tipo === 'inclusao' ? `➕ Nova ação${s.acao_numero ? ' ' + s.acao_numero : ''}` : 'Ação ' + s.acao_numero} · ${esc(s.acao_titulo || '')}</strong>
-              <span class="pa-sit ${s.situacao}">${nomeSit[s.situacao]}</span></div>
+              <span class="pa-sit ${s.situacao}">${nomeSit[s.situacao]}${(s.situacao === 'aprovada' || s.situacao === 'recusada') && !s.lida_em ? ' · NOVO' : ''}</span></div>
             ${s.tipo === 'inclusao' ? fichaAcao(s.campos)
               : `<div class="pa-diff">${diffHtml(s.valores_anteriores, Object.assign({}, s.valores_anteriores, s.campos), Object.keys(s.campos))}</div>`}
             <div style="font-size:11px;color:#888">Enviada em ${fmtDataHora(s.criado_em)}${s.decidido_em && s.situacao !== 'cancelada' ? ` · decidida por ${esc(s.decidido_por_nome || '')} em ${fmtDataHora(s.decidido_em)}` : ''}</div>
