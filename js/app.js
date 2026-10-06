@@ -1226,9 +1226,16 @@
     return false;
   }
 
+  // Chama a função do servidor enviando o token do login no cabeçalho x-user-token
+  async function chamarGerenciarUsuarios(corpo) {
+    const { data: s } = await sb.auth.getSession();
+    const token = s && s.session ? s.session.access_token : '';
+    return sb.functions.invoke('gerenciar-usuarios', { body: corpo, headers: { 'x-user-token': token } });
+  }
+
   async function admFuncao(corpo, sucesso) {
     admAviso('Processando…');
-    const { data, error } = await sb.functions.invoke('gerenciar-usuarios', { body: corpo });
+    const { data, error } = await chamarGerenciarUsuarios(corpo);
     let msg = data && data.erro;
     if (error) {
       try { const ctx = await error.context.json(); msg = ctx.erro || error.message; } catch (_) { msg = error.message; }
@@ -1273,7 +1280,7 @@
     for (const u of lista) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u.email)) { linhas.push(`❌ ${esc(u.linha)} — e-mail inválido`); continue; }
       res.innerHTML = linhas.join('<br>') + (linhas.length ? '<br>' : '') + `⏳ Cadastrando ${esc(u.email)}…`;
-      const { data, error } = await sb.functions.invoke('gerenciar-usuarios', { body: { acao: 'criar', nome: u.nome, email: u.email, senha, perfil_id } });
+      const { data, error } = await chamarGerenciarUsuarios({ acao: 'criar', nome: u.nome, email: u.email, senha, perfil_id });
       let msg = data && data.erro;
       if (error) { try { const ctx = await error.context.json(); msg = ctx.erro || error.message; } catch (_) { msg = error.message; } }
       if (msg) linhas.push(`❌ ${esc(u.email)} — ${esc(msg)}`);
