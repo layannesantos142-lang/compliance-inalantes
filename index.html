@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Compliance — Inalantes e Produtos Perigosos</title>
-<link rel="stylesheet" href="css/estilo.css?v=2026100608">
+<link rel="stylesheet" href="css/estilo.css?v=2026100609">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js?v=2026100601"></script>
@@ -197,24 +197,24 @@
         <div><label class="adm-lb">Fase / Área *</label><select class="adm-in" id="pa-f-fase"></select></div>
         <div><label class="adm-lb">Prioridade *</label>
           <select class="adm-in" id="pa-f-prio"><option>Alta</option><option selected>Média</option><option>Baixa</option></select></div>
-        <div><label class="adm-lb">Custo (Quanto?)</label><input class="adm-in" id="pa-f-quanto" placeholder="Ex.: Sem custo"></div>
+        <div><label class="adm-lb">Custo (Quanto?) *</label><input class="adm-in" id="pa-f-quanto" placeholder="Ex.: Sem custo adicional"></div>
       </div>
       <label class="adm-lb">O quê? (What) *</label>
       <textarea class="adm-in" id="pa-f-oque" rows="2" placeholder="Ação a ser realizada"></textarea>
-      <label class="adm-lb">Por quê? (Why)</label>
+      <label class="adm-lb">Por quê? (Why) *</label>
       <textarea class="adm-in" id="pa-f-porque" rows="2"></textarea>
       <div class="pa-modal-grid">
-        <div><label class="adm-lb">Onde? (Where)</label><input class="adm-in" id="pa-f-onde"></div>
-        <div><label class="adm-lb">Quem? — Área</label><input class="adm-in" id="pa-f-quemarea" placeholder="Ex.: Cadastros"></div>
-        <div><label class="adm-lb">Quem? — Colaborador</label><input class="adm-in" id="pa-f-quem"></div>
+        <div><label class="adm-lb">Onde? (Where) *</label><input class="adm-in" id="pa-f-onde"></div>
+        <div><label class="adm-lb">Quem? — Área *</label><input class="adm-in" id="pa-f-quemarea" placeholder="Ex.: Cadastros"></div>
+        <div><label class="adm-lb">Quem? — Colaborador *</label><input class="adm-in" id="pa-f-quem"></div>
       </div>
       <div class="pa-modal-grid">
-        <div style="grid-column:span 2"><label class="adm-lb">Como? (How)</label><input class="adm-in" id="pa-f-como"></div>
-        <div><label class="adm-lb">Gestor</label><input class="adm-in" id="pa-f-gestor"></div>
+        <div style="grid-column:span 2"><label class="adm-lb">Como? (How) *</label><input class="adm-in" id="pa-f-como"></div>
+        <div><label class="adm-lb">Gestor *</label><input class="adm-in" id="pa-f-gestor"></div>
       </div>
     </div>
     <div class="pa-modal-grid pa-modal-grid4">
-      <div><label class="adm-lb">Início</label>
+      <div><label class="adm-lb">Início<span class="pa-obrig-nova"> *</span></label>
         <input class="adm-in" id="pa-f-inicio" type="date"></div>
       <div><label class="adm-lb">Status</label>
         <select class="adm-in" id="pa-f-status">
@@ -222,7 +222,7 @@
         </select></div>
       <div><label class="adm-lb">% concluído</label>
         <input class="adm-in" id="pa-f-pct" type="number" min="0" max="100" step="5"></div>
-      <div><label class="adm-lb">Prazo</label>
+      <div><label class="adm-lb">Prazo<span class="pa-obrig-nova"> *</span></label>
         <input class="adm-in" id="pa-f-prazo" type="date"></div>
     </div>
     <label class="adm-lb">Observação da ação</label>
@@ -922,6 +922,6 @@
   </div>
 </div>
 
-<script src="js/app.js?v=2026100608"></script>
+<script src="js/app.js?v=2026100609"></script>
 </body>
 </html>
