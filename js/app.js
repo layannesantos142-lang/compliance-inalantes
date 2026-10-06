@@ -126,15 +126,61 @@
   // ---------------------------------------------------------------- autenticação
   async function iniciar() {
     const { data } = await sb.auth.getSession();
-    if (data.session) carregar(); else $('tela-login').hidden = false;
+    if (data.session) posLogin(data.session.user); else $('tela-login').hidden = false;
+  }
+  // Quem entrou com a senha padrão (cadastro novo ou senha resetada) precisa criar a própria senha
+  function posLogin(user) {
+    const meta = (user && user.user_metadata) || {};
+    if (meta.deve_trocar_senha) abrirTrocaSenha(true);
+    else carregar();
   }
   $('form-login').addEventListener('submit', async e => {
     e.preventDefault();
     $('login-erro').textContent = '';
-    const { error } = await sb.auth.signInWithPassword({ email: $('login-email').value.trim(), password: $('login-senha').value });
-    if (error) { $('login-erro').textContent = 'Não foi possível entrar: ' + error.message; return; }
+    const { data, error } = await sb.auth.signInWithPassword({ email: $('login-email').value.trim().toLowerCase(), password: $('login-senha').value });
+    if (error) {
+      $('login-erro').textContent = /invalid login credentials/i.test(error.message)
+        ? 'E-mail ou senha incorretos.' : 'Não foi possível entrar: ' + error.message;
+      return;
+    }
     $('tela-login').hidden = true;
-    carregar();
+    posLogin(data.user);
+  });
+
+  // ---------------------------------------------------------------- troca de senha (primeiro acesso ou "Alterar minha senha")
+  let trocaObrigatoria = false;
+  window.abrirTrocaSenha = function (obrigatoria) {
+    trocaObrigatoria = !!obrigatoria;
+    $('senha-titulo').textContent = obrigatoria ? 'Crie sua senha' : 'Alterar minha senha';
+    $('senha-sub').textContent = obrigatoria
+      ? 'Você entrou com a senha padrão. Por segurança, defina agora uma senha pessoal para continuar.'
+      : 'Digite e confirme a nova senha.';
+    $('senha-cancelar').hidden = obrigatoria;
+    $('senha-erro').textContent = '';
+    $('senha-erro').style.color = '';
+    $('form-senha').reset();
+    $('tela-senha').hidden = false;
+    setTimeout(() => $('senha-nova').focus(), 50);
+  };
+  $('senha-cancelar').addEventListener('click', () => { $('tela-senha').hidden = true; });
+  $('form-senha').addEventListener('submit', async e => {
+    e.preventDefault();
+    const nova = $('senha-nova').value, conf = $('senha-conf').value;
+    const erro = t => { $('senha-erro').style.color = ''; $('senha-erro').textContent = t; };
+    if (nova.length < 8) return erro('A senha precisa ter pelo menos 8 caracteres.');
+    if (nova !== conf) return erro('As senhas digitadas não são iguais.');
+    const { error } = await sb.auth.updateUser({ password: nova, data: { deve_trocar_senha: false } });
+    if (error) {
+      return erro(/different from the old|same as/i.test(error.message) ? 'A nova senha precisa ser diferente da senha atual.'
+        : /weak|short/i.test(error.message) ? 'Senha fraca: use pelo menos 8 caracteres, com letras e números.'
+        : 'Não foi possível alterar a senha: ' + error.message);
+    }
+    $('senha-erro').style.color = 'var(--verde-texto)';
+    $('senha-erro').textContent = 'Senha alterada com sucesso.';
+    setTimeout(() => {
+      $('tela-senha').hidden = true;
+      if (trocaObrigatoria) { trocaObrigatoria = false; carregar(); }
+    }, 900);
   });
   window.sair = async () => { await sb.auth.signOut(); location.reload(); };
 
@@ -1131,9 +1177,9 @@
         <td>${ehAdmin ? '<span class="risco risco-alto">Administrador · acesso total</span>'
           : `<select class="adm-perfil">${admOpcoesPerfil(u.perfil_id)}</select>`}</td>
         <td>${u.ativo ? '<span class="pill-s">Ativo</span>' : '<span class="pill-n">Desativado</span>'}</td>
-        <td style="white-space:nowrap">${ehAdmin ? '<button class="adm-btn" data-acao="senha">Nova senha</button>' : `
+        <td style="white-space:nowrap">${ehAdmin ? '<button class="adm-btn" data-acao="senha">Resetar senha</button>' : `
           <button class="adm-btn" data-acao="status">${u.ativo ? 'Desativar' : 'Reativar'}</button>
-          <button class="adm-btn" data-acao="senha">Nova senha</button>
+          <button class="adm-btn" data-acao="senha">Resetar senha</button>
           <button class="adm-btn adm-btn-perigo" data-acao="excluir">Excluir</button>`}</td>
       </tr>`;
     }).join('') || '<tr><td colspan="4" class="vazio">Nenhum usuário cadastrado.</td></tr>';
@@ -1161,7 +1207,7 @@
       $('adm-senha-nova').focus();
       $('adm-senha-ok').onclick = async () => {
         const senha = $('adm-senha-nova').value;
-        const ok = await admFuncao({ acao: 'redefinir_senha', user_id: u.user_id, senha }, `Senha de ${u.nome} redefinida. Informe a nova senha ao usuário.`);
+        const ok = await admFuncao({ acao: 'redefinir_senha', user_id: u.user_id, senha }, `Senha de ${u.nome} resetada. Informe a senha padrão; no próximo acesso o usuário criará uma nova.`);
         if (ok) $('adm-senha-box').hidden = true;
       };
     } else if (acao === 'excluir') {
@@ -1201,14 +1247,41 @@
     el.hidden = !texto;
   }
 
+  // Cadastro em lote: uma linha por usuário ("e-mail" ou "Nome; e-mail"), todos com a mesma senha padrão
+  function nomeDoEmail(email) {
+    return email.split('@')[0].split(/[._-]+/).filter(Boolean)
+      .map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' ');
+  }
+  function lerLista(texto) {
+    return texto.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => {
+      const partes = l.split(/[;\t,]/).map(p => p.trim()).filter(Boolean);
+      const email = (partes.find(p => p.includes('@')) || '').toLowerCase();
+      const nome = partes.find(p => !p.includes('@')) || (email ? nomeDoEmail(email) : '');
+      return { linha: l, email, nome };
+    });
+  }
   $('adm-form-usuario').addEventListener('submit', async e => {
     e.preventDefault();
-    const corpo = {
-      acao: 'criar', nome: $('adm-nu-nome').value.trim(), email: $('adm-nu-email').value.trim(),
-      senha: $('adm-nu-senha').value, perfil_id: $('adm-nu-perfil').value ? +$('adm-nu-perfil').value : null
-    };
-    const ok = await admFuncao(corpo, `Usuário ${corpo.nome} cadastrado no Supabase. Informe a senha provisória ao usuário.`);
-    if (ok) e.target.reset();
+    const senha = $('adm-nu-senha').value;
+    const perfil_id = $('adm-nu-perfil').value ? +$('adm-nu-perfil').value : null;
+    const lista = lerLista($('adm-nu-lista').value);
+    const res = $('adm-lote-resultado');
+    if (!lista.length) return;
+    if (senha.length < 8) { admAviso('A senha padrão precisa ter pelo menos 8 caracteres.', true); return; }
+    const linhas = [];
+    let ok = 0;
+    for (const u of lista) {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u.email)) { linhas.push(`❌ ${esc(u.linha)} — e-mail inválido`); continue; }
+      res.innerHTML = linhas.join('<br>') + (linhas.length ? '<br>' : '') + `⏳ Cadastrando ${esc(u.email)}…`;
+      const { data, error } = await sb.functions.invoke('gerenciar-usuarios', { body: { acao: 'criar', nome: u.nome, email: u.email, senha, perfil_id } });
+      let msg = data && data.erro;
+      if (error) { try { const ctx = await error.context.json(); msg = ctx.erro || error.message; } catch (_) { msg = error.message; } }
+      if (msg) linhas.push(`❌ ${esc(u.email)} — ${esc(msg)}`);
+      else { linhas.push(`✅ ${esc(u.nome)} — ${esc(u.email)}`); ok++; }
+    }
+    res.innerHTML = linhas.join('<br>');
+    admAviso(`${ok} de ${lista.length} usuário(s) cadastrado(s). Informe o e-mail e a senha padrão; no primeiro acesso cada um criará a própria senha.`, ok < lista.length);
+    if (ok) { $('adm-nu-lista').value = ''; await admCarregar(); }
   });
 
   function admRenderPerfis() {
