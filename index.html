@@ -31,6 +31,22 @@
   </form>
 </div>
 
+<!-- ============ TROCA DE SENHA ============ -->
+<div class="overlay" id="tela-senha" hidden>
+  <form class="login-box" id="form-senha" autocomplete="off">
+    <div class="sb-logo">FC</div>
+    <h2 id="senha-titulo">Crie sua senha</h2>
+    <p id="senha-sub">Este é o seu primeiro acesso com a senha padrão. Por segurança, defina agora uma senha pessoal.</p>
+    <label for="senha-nova">Nova senha (mín. 8 caracteres)</label>
+    <input type="password" id="senha-nova" minlength="8" required autocomplete="new-password">
+    <label for="senha-conf">Confirme a nova senha</label>
+    <input type="password" id="senha-conf" minlength="8" required autocomplete="new-password">
+    <button type="submit">Salvar nova senha</button>
+    <button type="button" class="login-sec" id="senha-cancelar" hidden>Cancelar</button>
+    <div class="login-erro" id="senha-erro"></div>
+  </form>
+</div>
+
 <!-- ============ CARREGANDO ============ -->
 <div class="overlay" id="tela-carregando" hidden>
   <div style="text-align:center">
@@ -75,6 +91,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 000 18z" fill="currentColor"/></svg>
       <span id="btn-tema-txt">Modo escuro</span>
     </button>
+    <button class="sb-btn sb-btn-tema" onclick="abrirTrocaSenha(false)">Alterar minha senha</button>
     <button class="sb-btn sb-btn-tema" onclick="sair()">Sair</button>
   </div>
 </aside>
@@ -259,17 +276,16 @@
     <div class="adm-grid">
       <!-- NOVO USUÁRIO -->
       <form class="card" id="adm-form-usuario" autocomplete="off">
-        <h3>👤 Cadastrar novo usuário</h3>
-        <label class="adm-lb">Nome completo</label>
-        <input class="adm-in" id="adm-nu-nome" required>
-        <label class="adm-lb">E-mail (login)</label>
-        <input class="adm-in" id="adm-nu-email" type="email" required autocomplete="off">
-        <label class="adm-lb">Senha provisória (mín. 8 caracteres)</label>
+        <h3>👤 Cadastrar usuários</h3>
+        <label class="adm-lb">E-mails (um por linha — opcional: Nome; e-mail)</label>
+        <textarea class="adm-in" id="adm-nu-lista" rows="5" required placeholder="marcelo.castim@ferreiracosta.com.br&#10;Maria Luiza; maria.luiza@ferreiracosta.com.br"></textarea>
+        <label class="adm-lb">Senha padrão (mín. 8 caracteres)</label>
         <input class="adm-in" id="adm-nu-senha" type="password" minlength="8" required autocomplete="new-password">
         <label class="adm-lb">Perfil de acesso</label>
         <select class="adm-in" id="adm-nu-perfil"></select>
         <button class="btn-pdf" type="submit" style="margin-top:14px">Cadastrar no Supabase</button>
-        <p style="font-size:11px;color:var(--cinza-medio);margin-top:8px;line-height:1.5">O usuário entra com este e-mail e a senha provisória. O e-mail já fica confirmado.</p>
+        <p style="font-size:11px;color:var(--cinza-medio);margin-top:8px;line-height:1.5">Todos entram com o próprio e-mail e a senha padrão. No primeiro acesso, o sistema obriga cada um a criar uma senha pessoal.</p>
+        <div id="adm-lote-resultado" style="font-size:12px;margin-top:8px;line-height:1.6"></div>
       </form>
 
       <!-- PERFIL -->
@@ -298,7 +314,8 @@
         </table>
       </div>
       <div id="adm-senha-box" class="adm-senha" hidden>
-        <strong>Nova senha para <span id="adm-senha-alvo"></span></strong>
+        <strong>Resetar senha de <span id="adm-senha-alvo"></span></strong>
+        <div style="font-size:11px;color:var(--cinza-medio);margin-top:2px">Defina uma senha padrão; no próximo acesso o usuário será obrigado a criar uma nova.</div>
         <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
           <input class="adm-in" id="adm-senha-nova" type="password" minlength="8" placeholder="mín. 8 caracteres" autocomplete="new-password" style="max-width:260px;margin:0">
           <button class="adm-btn" id="adm-senha-ok" type="button">Salvar senha</button>
