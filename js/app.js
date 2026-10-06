@@ -1137,6 +1137,8 @@
     const fase = $('pa-f-fase');
     fase.innerHTML = (S.fases || []).map(f => `<option>${esc(f.nome)}</option>`).join('');
     $('pa-f-novos').hidden = false;
+    document.querySelectorAll('.pa-obrig-nova').forEach(el => { el.hidden = false; });
+    document.querySelectorAll('#pa-form .pa-falta').forEach(el => el.classList.remove('pa-falta'));
     $('pa-modal-eyebrow').textContent = admin ? 'Nova ação (inclusão direta)' : 'Propor nova ação';
     $('pa-modal-titulo').textContent = 'Nova ação no plano 5W2H';
     $('pa-modal-sub').textContent = admin
@@ -1161,6 +1163,8 @@
     if (!a) return;
     formPlano = { num, admin: comoAdmin, nova: false };
     $('pa-f-novos').hidden = true;
+    document.querySelectorAll('.pa-obrig-nova').forEach(el => { el.hidden = true; });
+    document.querySelectorAll('#pa-form .pa-falta').forEach(el => el.classList.remove('pa-falta'));
     $('pa-f-inicio').value = a.inicio || '';
     $('pa-modal-eyebrow').textContent = comoAdmin ? 'Editar ação (aplica imediatamente)' : 'Solicitar atualização';
     $('pa-modal-titulo').textContent = `Ação ${a.numero} · ${a.o_que}`;
@@ -1193,8 +1197,15 @@
     }
     if (formPlano.nova) {
       Object.entries(CAMPOS_NOVA).forEach(([k, id]) => { campos[k] = $(id).value.trim() || null; });
-      if (!campos.o_que) { $('pa-f-erro').textContent = 'Informe o que será feito (O quê?).'; return; }
-      if (!campos.quem && !campos.quem_area) { $('pa-f-erro').textContent = 'Informe o responsável (área ou colaborador).'; return; }
+      // nova ação: todas as perguntas do 5W2H, início e prazo são obrigatórios
+      const faltam = Object.keys(CAMPOS_NOVA).concat(['inicio', 'prazo']).filter(k => !campos[k]);
+      document.querySelectorAll('#pa-form .pa-falta').forEach(el => el.classList.remove('pa-falta'));
+      if (faltam.length) {
+        faltam.forEach(k => $(CAMPOS_NOVA[k] || 'pa-f-' + k).classList.add('pa-falta'));
+        $('pa-f-erro').textContent = 'Preencha todos os campos obrigatórios: ' + faltam.map(k => ROT_ACAO[k]).join(', ') + '.';
+        $(CAMPOS_NOVA[faltam[0]] || 'pa-f-' + faltam[0]).focus();
+        return;
+      }
     }
     $('pa-f-enviar').disabled = true;
     const coment = $('pa-f-coment').value;
